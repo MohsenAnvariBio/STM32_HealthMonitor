@@ -28,6 +28,7 @@
 #include "pulse_oximeter.h"
 #include "system.h"
 #include "string.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,6 +51,9 @@ I2C_HandleTypeDef hi2c2;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t pulseOximiterIntFlag = 0;
+#define FILTER_LENGTH 10       // Length of the high-pass filter buffer
+#define MOVING_AVG_LENGTH 2    // Length of the moving average buffer
+#define ALPHA 0.95f // High-pass filter coefficient
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -60,6 +64,8 @@ static void MX_I2C2_Init(void);
 void Display_SpO2_Update(uint32_t spo2);
 void Display_SpO2_Init(void);
 uint32_t calculate_spo2(uint32_t red_data, uint32_t ir_data);
+float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha);
+void highPassFilterWithBuffer(float input, float *inputBuffer, float *outputBuffer, float *filteredSample, float alpha) ;
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -126,8 +132,9 @@ int main(void)
 	lv_obj_align(chart, LV_ALIGN_CENTER, 0, -25);
 	lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_CIRCULAR);
 	lv_chart_set_type(chart, LV_CHART_TYPE_LINE);   /*Show lines and points too*/
-	lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -800, 800);
-	lv_chart_set_point_count(chart, 800);
+	lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -10, 10);
+	uint16_t cnt = 800;
+	lv_chart_set_point_count(chart, cnt);
 	lv_chart_series_t * ser2 = lv_chart_add_series(chart, lv_palette_main(LV_PALETTE_GREEN), LV_CHART_AXIS_SECONDARY_Y);
 
 
@@ -156,7 +163,7 @@ int main(void)
 	FIFO_LED_DATA fifoLedData;
 	pulseOximeter_resetRegisters();
 	pulseOximeter_initFifo();
-	pulseOximeter_setSampleRate(_3200SPS);
+	pulseOximeter_setSampleRate(_800SPS);
 	pulseOximeter_setPulseWidth(_411_US);
 	pulseOximeter_setLedCurrent(RED_LED, 50);
 	pulseOximeter_setLedCurrent(IR_LED, 5);
@@ -168,8 +175,16 @@ int main(void)
 	// MULTI_LED - Both led's active (timing can be configured; see DataSheet)
 	pulseOximeter_setMeasurementMode(SPO2);
 
-
+//	uint32_t dataBuffer[cnt];
 	currentMillis = millis();
+//	static uint8_t chartUpdateCounter = 0;
+//	uint32_t i = 0;
+//	static float prevInput = 0.0f, prevOutput = 0.0f;  // Maintain history for filtering
+//	float alpha = 0.95f;  // High-pass filter coefficient (tune as needed)
+
+	float inputBuffer[FILTER_LENGTH] = {0};       // High-pass filter input buffer
+	float outputBuffer[FILTER_LENGTH] = {0};      // High-pass filter output buffer
+	float movingAvgBuffer[MOVING_AVG_LENGTH] = {0}; // Moving average buffer
 
   while (1)
   {
@@ -183,15 +198,29 @@ int main(void)
 			  // Read FIFO LED Data
 			  fifoLedData = pulseOximeter_readFifo();
 
-			  // Get BPM/SpO2 readings
-			  pulseOximeter = pulseOximeter_update(fifoLedData);
-	          float temp = pulseOximeter.irCardiogram;
-	          lv_chart_set_next_value(chart, ser2, (int32_t)temp/20+50);
+//			  pulseOximeter = pulseOximeter_update(fifoLedData);
+//	          float temp = pulseOximeter.irCardiogram;
+			  float temp = (uint32_t)fifoLedData.irLedRaw;
 
-//	          char buffer[16];
-//	          sprintf(buffer, "SpO2:  %ld%%", pulseOximeter.SpO2);
-//	          lv_label_set_text(label_S, buffer);
 
+			  // Apply the high-pass filter
+//			  float filteredSample = highPassFilter(temp, &prevInput, &prevOutput, alpha);
+//			  float filteredSample = 0.0f;
+//			  highPassFilterWithBuffer(temp, inputBuffer, outputBuffer, &filteredSample, ALPHA);
+			  float filteredSample = 0.0f;
+			  float smoothedSample = 0.0f;
+			  highPassFilterWithBufferAndMovingAvg(temp, inputBuffer, outputBuffer, &filteredSample, ALPHA, movingAvgBuffer, &smoothedSample);
+
+
+			  // Update the chart with the filtered value
+			  lv_chart_set_next_value(chart, ser2, (int32_t)(smoothedSample +40));
+
+
+//	          if(i<cnt){
+//	        	  dataBuffer[i++] = temp;
+//	          }else{
+//	        	  detectPeak(dataBuffer);
+//	          }
 
 			  pulseOximeter_clearInterrupt();
 		  }
@@ -208,7 +237,7 @@ int main(void)
 		  pulseOximeter_resetFifo();
 
 		  // Small delay
-		  HAL_Delay(10);
+		  HAL_Delay(1);
 	  }
 	  currentMillis = millis();
 	  if( currentMillis - lastMillis > 1000 )
@@ -222,7 +251,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  HAL_Delay(5);
+	  HAL_Delay(1);
 	  lv_timer_handler();
   }
   /* USER CODE END 3 */
@@ -381,12 +410,67 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	if(GPIO_Pin == GPIO_PIN_9)
 	{
 		pulseOximiterIntFlag = 1;
-
-		//spO2_registerDump();
 	}
 }
 
+float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha) {
+    // Apply the high-pass filter formula
+    float output = alpha * (*prevOutput + input - *prevInput);
+    *prevInput = input;     // Update previous input
+    *prevOutput = output;   // Update previous output
+    return output;
+}
 
+
+
+void highPassFilterWithBuffer(float input, float *inputBuffer, float *outputBuffer, float *filteredSample, float alpha) {
+    static int index = 0; // Circular buffer index
+
+    // Add new input to the buffer (circular behavior)
+    inputBuffer[index] = input;
+
+    // Compute the high-pass filter output
+    int prevIndex = (index - 1 + FILTER_LENGTH) % FILTER_LENGTH; // Previous index in circular buffer
+    outputBuffer[index] = alpha * (outputBuffer[prevIndex] + inputBuffer[index] - inputBuffer[prevIndex]);
+
+    // Save the current filtered sample for visualization
+    *filteredSample = outputBuffer[index];
+
+    // Advance the circular buffer index
+    index = (index + 1) % FILTER_LENGTH;
+}
+void highPassFilterWithBufferAndMovingAvg(float input, float *inputBuffer, float *outputBuffer,
+                                          float *filteredSample, float alpha,
+                                          float *movingAvgBuffer, float *smoothedSample) {
+    static int index = 0;                // Circular buffer index for high-pass filter
+    static int movingAvgIndex = 0;       // Circular buffer index for moving average
+    static float movingAvgSum = 0.0f;    // Sum of moving average buffer for efficiency
+
+    // Add new input to the high-pass filter input buffer (circular behavior)
+    inputBuffer[index] = input;
+
+    // Compute the high-pass filter output
+    int prevIndex = (index - 1 + FILTER_LENGTH) % FILTER_LENGTH; // Previous index in circular buffer
+    outputBuffer[index] = alpha * (outputBuffer[prevIndex] + inputBuffer[index] - inputBuffer[prevIndex]);
+
+    printf("High-Pass Filter Output: %f\n", outputBuffer[index]);
+
+
+    // Store the current high-pass filtered sample
+    *filteredSample = outputBuffer[index];
+
+    // Add the filtered output to the moving average buffer
+    movingAvgSum -= movingAvgBuffer[movingAvgIndex]; // Remove the oldest value from the sum
+    movingAvgBuffer[movingAvgIndex] = outputBuffer[index]; // Add the new value to the buffer
+    movingAvgSum += movingAvgBuffer[movingAvgIndex]; // Update the sum with the new value
+
+    // Compute the moving average
+    *smoothedSample = movingAvgSum / MOVING_AVG_LENGTH;
+
+    // Update the indices for both buffers
+    index = (index + 1) % FILTER_LENGTH;
+    movingAvgIndex = (movingAvgIndex + 1) % MOVING_AVG_LENGTH;
+}
 /* USER CODE END 4 */
 
 /**

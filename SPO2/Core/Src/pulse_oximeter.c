@@ -14,7 +14,7 @@
 #include "math.h"
 #include "system.h"
 //I2C_HandleTypeDef hi2c2;
-extern hi2c2;
+extern I2C_HandleTypeDef hi2c2;
 MAX30102 pulseOximeter = {0};
 FIFO_LED_DATA fifoData = {0};
 
