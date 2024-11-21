@@ -48,12 +48,12 @@ uint8_t avg_last;
  **********************/
 static SPI_HandleTypeDef hspi1;
 
-#define XPT2046_SPI1_SCK_Pin 			GPIO_PIN_5
-#define XPT2046_SPI1_SCK_GPIO_Port 		GPIOA
-#define XPT2046_SPI1_MISO_Pin 			GPIO_PIN_6
-#define XPT2046_SPI1_MISO_GPIO_Port 	GPIOA
-#define XPT2046_SPI1_MOSI_Pin 			GPIO_PIN_7
-#define XPT2046_PI1_MOSI_GPIO_Port 		GPIOA
+#define XPT2046_SPI3_SCK_Pin 			GPIO_PIN_10
+#define XPT2046_SPI3_SCK_GPIO_Port 		GPIOC
+#define XPT2046_SPI3_MISO_Pin 			GPIO_PIN_11
+#define XPT2046_SPI3_MISO_GPIO_Port 	GPIOC
+#define XPT2046_SPI3_MOSI_Pin 			GPIO_PIN_1
+#define XPT2046_PI1_MOSI_GPIO_Port 		GPIOC
 
 uint8_t xpt2046_xchg_value(uint8_t val)
 {
@@ -75,27 +75,32 @@ void xpt2046_cs(uint8_t val)
 void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-  if(hspi->Instance==SPI1)
+  if(hspi->Instance==SPI3)
   {
   /* USER CODE BEGIN SPI1_MspInit 0 */
 
   /* USER CODE END SPI1_MspInit 0 */
     /* Peripheral clock enable */
-    __HAL_RCC_SPI1_CLK_ENABLE();
-
+    __HAL_RCC_SPI3_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
     /**SPI1 GPIO Configuration
-    PA5     ------> SPI1_SCK
-    PA6     ------> SPI1_MISO
-    PA7     ------> SPI1_MOSI
-    PA10     ------> SPI1_NSS
+    PC10     ------> SPI3_SCK
+    PC11     ------> SPI3_MISO
+    PC1      ------> SPI3_MOSI
+    PA10     ------> SPI3_NSS
     */
-    GPIO_InitStruct.Pin = XPT2046_SPI1_SCK_Pin|XPT2046_SPI1_MISO_Pin|XPT2046_SPI1_MOSI_Pin;
+    GPIO_InitStruct.Pin = XPT2046_SPI3_SCK_Pin|XPT2046_SPI3_MISO_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = XPT2046_SPI3_MOSI_Pin;
+    GPIO_InitStruct.Alternate = GPIO_AF5_SPI3;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
     GPIO_InitStruct.Pin = GPIO_PIN_10;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -121,7 +126,7 @@ static void MX_SPI1_Init(void)
 
   /* USER CODE END SPI1_Init 1 */
   /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
+  hspi1.Instance = SPI3;
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;

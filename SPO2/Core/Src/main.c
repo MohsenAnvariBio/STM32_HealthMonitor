@@ -29,6 +29,7 @@
 #include "system.h"
 #include "string.h"
 #include <stdio.h>
+#include "chart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -64,7 +65,6 @@ static void MX_I2C2_Init(void);
 /* USER CODE BEGIN PFP */
 void Display_SpO2_Update(uint32_t spo2);
 void Display_SpO2_Init(void);
-uint32_t calculate_spo2(uint32_t red_data, uint32_t ir_data);
 float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha);
 void highPassFilterWithBuffer(float input, float *inputBuffer, float *outputBuffer, float *filteredSample, float alpha) ;
 float mean(const float *buffer, uint16_t size);
@@ -92,7 +92,7 @@ int main(void)
 
   /* USER CODE BEGIN Init */
 
-  /* USER CODE END Init */
+//  /* USER CODE END Init */
 
   /* Configure the system clock */
   SystemClock_Config();
@@ -102,9 +102,8 @@ int main(void)
   tft_init();
   lv_disp_set_rotation(lv_disp_get_default(), LV_DISP_ROT_270);
   touchpad_init();
-  //lv_example_label_1();
-//  Display_SpO2_Init();
 
+  lv_example_spinbox_with_chart();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -112,135 +111,63 @@ int main(void)
   MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
 
+  FIFO_LED_DATA fifoLedData;
+  pulseOximeter_resetRegisters();
+  pulseOximeter_initFifo();
+  pulseOximeter_setSampleRate(_800SPS);
+  pulseOximeter_setPulseWidth(_411_US);
+  pulseOximeter_setLedCurrent(RED_LED, 50);
+  pulseOximeter_setLedCurrent(IR_LED, 5);
+  pulseOximeter_resetFifo();
+  pulseOximeter_setMeasurementMode(SPO2);
 
-	lv_obj_t * label_S;
-	lv_obj_t * label_t;
-	lv_obj_t * chart;
-
-	//Title
-	label_t = lv_label_create(lv_scr_act());
-	lv_label_set_long_mode(label_t, LV_LABEL_LONG_WRAP);     /*Break the long lines*/
-	lv_label_set_recolor(label_t, true);                      /*Enable re-coloring by commands in the text*/
-	lv_label_set_text(label_t, "#0000ff SPO2 Measurement#");
-	lv_obj_align(label_t,LV_ALIGN_TOP_MID,0, 10);
-
-	/*Create a chart*/
-
-	chart = lv_chart_create(lv_scr_act());
-	lv_obj_set_size(chart, 310, 200);
-	lv_obj_align_to(chart, label_t, LV_ALIGN_TOP_MID,0,20);
-	lv_obj_align(chart, LV_ALIGN_CENTER, 0, -25);
-	lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_CIRCULAR);
-	lv_chart_set_type(chart, LV_CHART_TYPE_LINE);   /*Show lines and points too*/
-	lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -200, 200);
-	uint16_t cnt = 1000;
-	lv_chart_set_point_count(chart, cnt);
-	lv_chart_series_t * ser2 = lv_chart_add_series(chart, lv_palette_main(LV_PALETTE_GREEN), LV_CHART_AXIS_SECONDARY_Y);
-	lv_chart_series_t * ser1 = lv_chart_add_series(chart, lv_palette_main(LV_PALETTE_BLUE), LV_CHART_AXIS_SECONDARY_Y);
+  // High-pass filter state variables
+  float prevInput = 0.0f, prevOutput = 0.0f;
+  float buffer[M] = {0};
+  int i = 0;
+  int filled = 0;
 
 
-	// Create the label once during initialization
-	label_S = lv_label_create(lv_scr_act());
-	lv_label_set_long_mode(label_S, LV_LABEL_LONG_WRAP);
-	lv_label_set_recolor(label_S, true);
-	lv_obj_align_to(label_S, chart, LV_ALIGN_TOP_LEFT,0,100);
+  /* USER CODE END 2 */
 
-	/* Create a style for the label */
-	static lv_style_t style_label_border;
-	lv_style_init(&style_label_border);
-	lv_style_set_border_width(&style_label_border, 2);               // Border width
-	lv_style_set_border_color(&style_label_border, lv_color_black()); // Border color
-	lv_style_set_border_opa(&style_label_border, LV_OPA_50);         // Border opacity
-	lv_style_set_pad_all(&style_label_border, 5);                   // Add padding inside the border
-
-	/* Apply the style to the label */
-	lv_obj_add_style(label_S, &style_label_border, 0);
-
-
-
-
-
-	FIFO_LED_DATA fifoLedData;
-	pulseOximeter_resetRegisters();
-	pulseOximeter_initFifo();
-	pulseOximeter_setSampleRate(_800SPS);
-	pulseOximeter_setPulseWidth(_411_US);
-	pulseOximeter_setLedCurrent(RED_LED, 50);
-	pulseOximeter_setLedCurrent(IR_LED, 5);
-	pulseOximeter_resetFifo();
-	// Set the Measurement Mode
-	// Measurement Modes:
-	// HEART_RATE - only Red Led active
-	// SPO2 - Both IR & Red Led active
-	// MULTI_LED - Both led's active (timing can be configured; see DataSheet)
-	pulseOximeter_setMeasurementMode(SPO2);
-
-	// High-pass filter state variables
-	float prevInput = 0.0f, prevOutput = 0.0f;
-
-	// Circular buffer for storing filtered values
-	float buffer[M] = {0};
-	int i = 0;
-	int filled = 0; // Tracks if the buffer is fully filled
-
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
   while (1)
   {
-//
-	  if( PUSLE_OXIMETER_INTERRUPT == 1 )
-	  {
-		  if( pulseOximiterIntFlag )
-		  {
-			  pulseOximiterIntFlag = 0;
-			  fifoLedData = pulseOximeter_readFifo();
-			  float ppg_signal = (float)fifoLedData.irLedRaw;
-
-			  float ppg_signal_rdc = highPassFilter(ppg_signal, &prevInput, &prevOutput, 0.95f);
-			  lv_chart_set_next_value(chart, ser1, (-ppg_signal_rdc /(40)) +20);
-
-			  // Fill or update the buffer
-			  if (i < M) {
-				  buffer[i] = ppg_signal_rdc; // Initial filling of the buffer
-				  i++;
-				  if (i == M) {
-					  filled = 1; // Mark buffer as filled
-				  }
-			  } else if (filled) {
-				  // Calculate mean of the buffer
-				  float output = mean(buffer, M);
-//			              printf("%.2f\n", k, output);
-				  lv_chart_set_next_value(chart, ser2, (-output /(40)) +60);
-
-				  // Shift buffer elements to the left
-				  for (int j = 0; j < M - 1; j++) {
-					  buffer[j] = buffer[j + 1];
-				  }
-
-				  // Add the new sample to the buffer
-				  buffer[M - 1] = ppg_signal_rdc;
-			  }
-
-			  pulseOximeter_clearInterrupt();
-		  }
-
-	  }
-//	  else{
-////
-//		  // Read FIFO LED Data
-//		  fifoLedData = pulseOximeter_readFifo();
-//
-//		  // Get BPM/SpO2 readings
-//		  pulseOximeter = pulseOximeter_update(fifoLedData);
-//
-//		  pulseOximeter_clearInterrupt();
-//		  pulseOximeter_resetFifo();
-//
-//		  // Small delay
-//		  HAL_Delay(1);
-//	  }
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  if( PUSLE_OXIMETER_INTERRUPT == 1 )
+	  	  {
+	  		  if( pulseOximiterIntFlag )
+	  		  {
+	  			  pulseOximiterIntFlag = 0;
+	  			  fifoLedData = pulseOximeter_readFifo();
+	  			  float ppg_signal = (float)fifoLedData.irLedRaw;
+	  			  // HPF
+	  			  float ppg_signal_rdc = highPassFilter(ppg_signal, &prevInput, &prevOutput, 0.95f);
+
+	  			  if(event_handler)
+	  			  {
+	  				update_chart_with_gain(ppg_signal_rdc);
+	  			  }else{
+					// Moving Average
+					if (i < M) {
+						buffer[i] = ppg_signal_rdc;
+						i++;
+						if (i == M) {filled = 1;}
+					} else if (filled) {
+						float output = mean(buffer, M);
+						update_chart_with_gain(output);
+						for (int j = 0; j < M - 1; j++) {buffer[j] = buffer[j + 1];}
+						buffer[M - 1] = ppg_signal_rdc;
+					}
+	  			  }
+
+	  			  pulseOximeter_clearInterrupt();
+	  		  }
+
+	  	  }
 	  HAL_Delay(1);
 	  lv_timer_handler();
   }
