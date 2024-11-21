@@ -103,7 +103,7 @@ int main(void)
   lv_disp_set_rotation(lv_disp_get_default(), LV_DISP_ROT_270);
   touchpad_init();
 
-  lv_example_spinbox_with_chart();
+  setup_ui();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -137,40 +137,46 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if( PUSLE_OXIMETER_INTERRUPT == 1 )
-	  	  {
-	  		  if( pulseOximiterIntFlag )
-	  		  {
-	  			  pulseOximiterIntFlag = 0;
-	  			  fifoLedData = pulseOximeter_readFifo();
-	  			  float ppg_signal = (float)fifoLedData.irLedRaw;
-	  			  // HPF
-	  			  float ppg_signal_rdc = highPassFilter(ppg_signal, &prevInput, &prevOutput, 0.95f);
+	  if (PUSLE_OXIMETER_INTERRUPT == 1) {
+		  if (pulseOximiterIntFlag) {
+			  pulseOximiterIntFlag = 0;
+			  fifoLedData = pulseOximeter_readFifo();
+			  float ppg_signal = (float)fifoLedData.irLedRaw;
 
-	  			  if(event_handler)
-	  			  {
-	  				update_chart_with_gain(ppg_signal_rdc);
-	  			  }else{
-					// Moving Average
-					if (i < M) {
-						buffer[i] = ppg_signal_rdc;
-						i++;
-						if (i == M) {filled = 1;}
-					} else if (filled) {
-						float output = mean(buffer, M);
-						update_chart_with_gain(output);
-						for (int j = 0; j < M - 1; j++) {buffer[j] = buffer[j + 1];}
-						buffer[M - 1] = ppg_signal_rdc;
-					}
-	  			  }
+			  // High-pass filter
+			  float ppg_signal_rdc = highPassFilter(ppg_signal, &prevInput, &prevOutput, 0.95f);
 
-	  			  pulseOximeter_clearInterrupt();
-	  		  }
+			  if (is_moving_average_enabled()) {
+				  // Moving average enabled
+				  if (i < M) {
+					  buffer[i] = ppg_signal_rdc;
+					  i++;
+					  if (i == M) {
+						  filled = 1;
+					  }
+				  } else if (filled) {
+					  float output = mean(buffer, M);
+					  update_chart_with_gain(output);
 
-	  	  }
+					  // Shift buffer elements
+					  for (int j = 0; j < M - 1; j++) {
+						  buffer[j] = buffer[j + 1];
+					  }
+					  buffer[M - 1] = ppg_signal_rdc;
+				  }
+			  } else {
+				  // Only high-pass filter
+				  update_chart_with_gain(ppg_signal_rdc);
+			  }
+
+			  pulseOximeter_clearInterrupt();
+		  }
+	  }
+
 	  HAL_Delay(1);
 	  lv_timer_handler();
   }
+
   /* USER CODE END 3 */
 }
 

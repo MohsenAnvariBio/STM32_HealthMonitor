@@ -6,6 +6,7 @@
  */
 
 #include"lvgl/lvgl.h"
+#include"chart.h"
 
 #if LV_USE_SPINBOX && LV_BUILD_EXAMPLES
 
@@ -13,7 +14,7 @@ static lv_obj_t *spinbox; // Declare the spinbox globally to use its value elsew
 static lv_obj_t *chart;   // Chart object
 static lv_chart_series_t *ser2; // Chart series
 lv_obj_t * label_t;
-lv_obj_t * sw;
+bool use_moving_average = false;
 
 // Increment event callback
 static void lv_spinbox_increment_event_cb(lv_event_t *e) {
@@ -40,31 +41,35 @@ void update_chart_with_gain(float output) {
     lv_chart_set_next_value(chart, ser2, (-output / gain) );
 }
 
-uint8_t event_handler(lv_event_t * e)
-{
+void switch_event_handler(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * obj = lv_event_get_target(e);
-    if(code == LV_EVENT_VALUE_CHANGED) {
-        return lv_obj_has_state(obj, LV_STATE_CHECKED);
+    if (code == LV_EVENT_VALUE_CHANGED) {
+        lv_obj_t *obj = lv_event_get_target(e);
+        use_moving_average = lv_obj_has_state(obj, LV_STATE_CHECKED);
     }
-    return 1;
 }
-
+bool is_moving_average_enabled() {
+    return use_moving_average;
+}
 // Spinbox and chart example initialization
-void lv_example_spinbox_with_chart(void) {
+void setup_ui(void) {
 
-	//Title
-	label_t = lv_label_create(lv_scr_act());
-	lv_label_set_long_mode(label_t, LV_LABEL_LONG_WRAP);     /*Break the long lines*/
-	lv_label_set_recolor(label_t, true);                      /*Enable re-coloring by commands in the text*/
-	lv_label_set_text(label_t, "#0000ff SPO2 Measurement#");
-	lv_obj_align(label_t,LV_ALIGN_TOP_MID,0, 10);
+	// Title
+	lv_obj_t *label_t = lv_label_create(lv_scr_act());
+	lv_label_set_long_mode(label_t, LV_LABEL_LONG_WRAP);     /* Break the long lines if needed */
+	lv_label_set_recolor(label_t, true);                    /* Enable re-coloring by commands in the text */
+	lv_label_set_text(label_t, "#0000ff SPO2 Measurement#"); /* Title text with blue color */
+	// Style the title
+	lv_obj_set_style_text_font(label_t, &lv_font_montserrat_22, LV_PART_MAIN); /* Larger, modern font */
+	lv_obj_set_style_text_color(label_t, lv_color_hex(0xff0000), LV_PART_MAIN); /* Add a secondary color (red for title text) */
+	lv_obj_set_style_text_align(label_t, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);   /* Center the text alignment */
+	lv_obj_align(label_t, LV_ALIGN_TOP_MID, 0, 2); /* Adjust alignment and position */
 
 
     // Create a chart
     chart = lv_chart_create(lv_scr_act());
-	lv_obj_set_size(chart, 310, 100);
-	lv_obj_align_to(chart, label_t, LV_ALIGN_TOP_MID,0,15);
+	lv_obj_set_size(chart, 310, 120);
+	lv_obj_align_to(chart, label_t, LV_ALIGN_TOP_MID,0,25);
 //	lv_obj_align(chart, LV_ALIGN_CENTER, 0, -25);
 	lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_CIRCULAR);
 	lv_chart_set_type(chart, LV_CHART_TYPE_LINE);   /*Show lines and points too*/
@@ -81,7 +86,7 @@ void lv_example_spinbox_with_chart(void) {
 	lv_spinbox_set_value(spinbox, 40); // Default gain value
 	lv_obj_set_width(spinbox, 0);
 	lv_obj_set_height(spinbox, 20);
-	lv_obj_align_to(spinbox, chart, LV_ALIGN_TOP_RIGHT, -15, 60);
+	lv_obj_align_to(spinbox, chart, LV_ALIGN_TOP_RIGHT, -20, 85);
 	lv_coord_t h = lv_obj_get_height(spinbox);
 
 
@@ -99,8 +104,17 @@ void lv_example_spinbox_with_chart(void) {
 	lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_PLUS, 0);
 	lv_obj_add_event_cb(btn, lv_spinbox_decrement_event_cb, LV_EVENT_ALL, NULL);
 
-    sw = lv_switch_create(lv_scr_act());
-    lv_obj_add_event_cb(sw, event_handler, LV_EVENT_ALL, NULL);
+    // Create the switch
+    lv_obj_t *sw = lv_switch_create(lv_scr_act());
+    lv_obj_set_size(sw, 40, 20);
+    lv_obj_align(sw, LV_ALIGN_TOP_RIGHT, -10, 10); // Align switch on screen
+    lv_obj_align_to(sw, chart, LV_ALIGN_TOP_LEFT, +80, 85);
+    lv_obj_add_event_cb(sw, switch_event_handler, LV_EVENT_ALL, NULL);
+
+    // Optionally, add a label for the switch
+    lv_obj_t *label = lv_label_create(lv_scr_act());
+    lv_label_set_text(label, "Enable MA");
+    lv_obj_align_to(label, sw, LV_ALIGN_OUT_LEFT_MID, -5, 0);
 
 }
 

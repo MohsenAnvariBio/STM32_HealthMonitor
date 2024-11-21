@@ -12,8 +12,10 @@
 extern "C" {
 #endif
 	void update_chart_with_gain(float output);
-	void lv_example_spinbox_with_chart(void);
-	uint8_t event_handler(lv_event_t * e);
+	void setup_ui(void);
+	bool event_handler(lv_event_t * e);
+
+	bool is_moving_average_enabled();
 #ifdef __cplusplus
 }
 #endif
