@@ -10,45 +10,96 @@
  */
 
 #include "filter.h"
+#include <stdio.h>
+#include <math.h>
 
-
-DC_FILTER_T dcRemoval(float x, float prev_w, float alpha)
-{
-  DC_FILTER_T filtered;
-  filtered.w = x + alpha * prev_w;
-  filtered.result = filtered.w - prev_w;
-
-  return filtered;
+// Helper function to calculate mean of an array
+float calculateMean(float *array, int length) {
+    float sum = 0;
+    for (int i = 0; i < length; i++) {
+        sum += array[i];
+    }
+    return sum / length;
 }
 
-//Low pass butterworth filter order=1 alpha1=0.1
-void lowPassButterworthFilter(float x, BUTTERWORTH_FILTER_T * filterResult)
-{
-	filterResult->v[0] = filterResult->v[1];
+// Main processing function
+float process_ppg_signal(float ppg_signal_rdc, float *buffer, int M, int *i, int *filled) {
+    float output = 0.0;
 
-    //Fs = 100Hz and Fc = 10Hz
-    filterResult->v[1] = (2.452372752527856026e-1 * x) + (0.50952544949442879485 * filterResult->v[0]);
+    if (*i < M) {
+        // Fill the buffer until it is full
+        buffer[*i] = ppg_signal_rdc;
+//        (*i)++;
+        if (*i == M) {
+            *filled = 1; // Mark buffer as full
+        }
+    } else if (*filled) {
+        // Compute the mean of the buffer
+        output = calculate_mean(buffer, M);
 
-    //Fs = 100Hz and Fc = 4Hz
-    //filterResult->v[1] = (1.367287359973195227e-1 * x) + (0.72654252800536101020 * filterResult->v[0]); //Very precise butterworth filter
+        // Shift buffer elements to make space for the new data
+        for (int j = 0; j < M - 1; j++) {
+            buffer[j] = buffer[j + 1];
+        }
+        buffer[M - 1] = ppg_signal_rdc;
+    }
 
-    filterResult->result = filterResult->v[0] + filterResult->v[1];
+    return output; // Return the calculated mean (0.0 if the buffer is not yet full)
 }
 
-float meanDiff(float M, MEAN_DIFF_FILTER_T* filterValues)
-{
-  float avg = 0;
 
-  filterValues->sum -= filterValues->values[filterValues->index];
-  filterValues->values[filterValues->index] = M;
-  filterValues->sum += filterValues->values[filterValues->index];
 
-  filterValues->index++;
-  filterValues->index = filterValues->index % MEAN_FILTER_SIZE;
+// Main function to find peaks
+void findPeaks(float *dataBuffer, int length, uint32_t *R, uint32_t *R_count) {
+    int Nd = 3;
+    int N = 4;
+    int RRmin = (int)(10); // Minimum refractory period
+    int QRSint = (int)(20); // Window for QRS complex
+    int pth = (int)(2); // Exponential decay factor
 
-  if(filterValues->count < MEAN_FILTER_SIZE)
-    filterValues->count++;
+    // Temporary buffers
+    uint32_t dif_d[length - Nd];
+    float max_val[length];
+    int max_pos[length];
 
-  avg = filterValues->sum / filterValues->count;
-  return avg - M;
+ // Compute differences
+    for (int i = 0; i < length - Nd; i++) {
+        dif_d[i] = dataBuffer[i + Nd] - dataBuffer[i]; // No need to cast explicitly
+        dif_d[i] = dif_d[i] * dif_d[i];
+    }
+
+    // Dynamic threshold and peak detection
+    float th = 10; // Initial threshold
+    int n = 0, s = 0, i = 0;
+    *R_count = 0; // Initialize R-peak count
+
+    while (n < length - Nd) {
+        if (dif_d[n] > th) {
+            float local_max = 0;
+            int local_max_pos = 0;
+
+            // Find local maximum in the window
+            for (int k = 0; k < RRmin + QRSint && n + k < length - Nd; k++) {
+                if (dif_d[n + k] > local_max) {
+                    local_max = dif_d[n + k];
+                    local_max_pos = k;
+                }
+            }
+
+            // Store the peak information
+            max_val[i] = local_max;
+            max_pos[i] = local_max_pos;
+            R[i] = n + local_max_pos + 2;
+            (*R_count)++;
+
+            // Update indices and threshold
+            int d = RRmin + QRSint - local_max_pos;
+            n += RRmin + QRSint + RRmin - d;
+            th = calculateMean(max_val, i + 1);
+            i++;
+        } else {
+            th *= exp(-pth / (float)FS);
+            n++;
+        }
+    }
 }

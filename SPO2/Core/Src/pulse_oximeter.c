@@ -27,10 +27,10 @@ SAMPLE_RATE sampleRate = _1000SPS;
 
 uint8_t fifoRdPtr = 0;
 
-DC_FILTER_T dcFilterIR = {0};
-DC_FILTER_T dcFilterRed = {0};
-MEAN_DIFF_FILTER_T meanDiffIR = {0};
-BUTTERWORTH_FILTER_T lpbFilterIR = {0};
+//DC_FILTER_T dcFilterIR = {0};
+//DC_FILTER_T dcFilterRed = {0};
+//MEAN_DIFF_FILTER_T meanDiffIR = {0};
+//BUTTERWORTH_FILTER_T lpbFilterIR = {0};
 
 float currentBPM;
 float valuesBPM[PULSE_BPM_SAMPLE_SIZE] = {0};
@@ -481,75 +481,75 @@ float pulseOximeter_readTemperature(void)
 
 
 
-MAX30102 pulseOximeter_update(FIFO_LED_DATA m_fifoData)
-{
-	MAX30102 result = {
-	/*bool pulseDetected*/ false,
-	/*float heartBPM*/ 0.0,
-	/*float irCardiogram*/ 0.0,
-	/*float irDcValue*/ 0.0,
-	/*float redDcValue*/ 0.0,
-	/*float SaO2*/ currentSpO2Value,
-	/*uint32_t lastBeatThreshold*/ 0,
-	/*float dcFilteredIR*/ 0.0,
-	/*float dcFilteredRed*/ 0.0,
-	/*float temperature;*/ 0.0
-  };
+//MAX30102 pulseOximeter_update(FIFO_LED_DATA m_fifoData)
+//{
+//	MAX30102 result = {
+//	/*bool pulseDetected*/ false,
+//	/*float heartBPM*/ 0.0,
+//	/*float irCardiogram*/ 0.0,
+//	/*float irDcValue*/ 0.0,
+//	/*float redDcValue*/ 0.0,
+//	/*float SaO2*/ currentSpO2Value,
+//	/*uint32_t lastBeatThreshold*/ 0,
+//	/*float dcFilteredIR*/ 0.0,
+//	/*float dcFilteredRed*/ 0.0,
+//	/*float temperature;*/ 0.0
+//  };
+//
+//	result.temperature = pulseOximeter_readTemperature();
+//
+//	dcFilterIR = dcRemoval( (float)m_fifoData.irLedRaw, dcFilterIR.w, ALPHA );
+//	dcFilterRed = dcRemoval( (float)m_fifoData.redLedRaw, dcFilterRed.w, ALPHA );
+//
+//	float meanDiffResIR = meanDiff( dcFilterIR.result, &meanDiffIR);
+//	lowPassButterworthFilter( meanDiffResIR/*-dcFilterIR.result*/, &lpbFilterIR );
+//
+//	irACValueSqSum += dcFilterIR.result * dcFilterIR.result;
+//	redACValueSqSum += dcFilterRed.result * dcFilterRed.result;
+//	samplesRecorded++;
+//
+//	if( detectPulse( lpbFilterIR.result ) && samplesRecorded > 0 )
+//	{
+//		result.pulseDetected=true;
+//		pulsesDetected++;
+//
+////		float ratioRMS = log( sqrt(redACValueSqSum/samplesRecorded) ) / log( sqrt(irACValueSqSum/samplesRecorded) );
+//
+//        // RMS ratio for Red/IR signals
+//        float irRMS = sqrt(irACValueSqSum / samplesRecorded);
+//        float redRMS = sqrt(redACValueSqSum / samplesRecorded);
+//        float ratioRMS = (redRMS / irRMS);
+//
+//        // Improved SpO2 formula
+//        currentSpO2Value = 104.0 - (17.0 * ratioRMS); // Calibrated formula
+//        if (currentSpO2Value < 70 || currentSpO2Value > 100) {
+//            currentSpO2Value = 0; // Out of range, invalid
+//        }
+//
+//
+//		result.SpO2 = currentSpO2Value;
+//
+//		if( pulsesDetected % RESET_SPO2_EVERY_N_PULSES == 0)
+//		{
+//			irACValueSqSum = 0;
+//			redACValueSqSum = 0;
+//			samplesRecorded = 0;
+//		}
+//	}
 
-	result.temperature = pulseOximeter_readTemperature();
-
-	dcFilterIR = dcRemoval( (float)m_fifoData.irLedRaw, dcFilterIR.w, ALPHA );
-	dcFilterRed = dcRemoval( (float)m_fifoData.redLedRaw, dcFilterRed.w, ALPHA );
-
-	float meanDiffResIR = meanDiff( dcFilterIR.result, &meanDiffIR);
-	lowPassButterworthFilter( meanDiffResIR/*-dcFilterIR.result*/, &lpbFilterIR );
-
-	irACValueSqSum += dcFilterIR.result * dcFilterIR.result;
-	redACValueSqSum += dcFilterRed.result * dcFilterRed.result;
-	samplesRecorded++;
-
-	if( detectPulse( lpbFilterIR.result ) && samplesRecorded > 0 )
-	{
-		result.pulseDetected=true;
-		pulsesDetected++;
-
-//		float ratioRMS = log( sqrt(redACValueSqSum/samplesRecorded) ) / log( sqrt(irACValueSqSum/samplesRecorded) );
-
-        // RMS ratio for Red/IR signals
-        float irRMS = sqrt(irACValueSqSum / samplesRecorded);
-        float redRMS = sqrt(redACValueSqSum / samplesRecorded);
-        float ratioRMS = (redRMS / irRMS);
-
-        // Improved SpO2 formula
-        currentSpO2Value = 104.0 - (17.0 * ratioRMS); // Calibrated formula
-        if (currentSpO2Value < 70 || currentSpO2Value > 100) {
-            currentSpO2Value = 0; // Out of range, invalid
-        }
-
-
-		result.SpO2 = currentSpO2Value;
-
-		if( pulsesDetected % RESET_SPO2_EVERY_N_PULSES == 0)
-		{
-			irACValueSqSum = 0;
-			redACValueSqSum = 0;
-			samplesRecorded = 0;
-		}
-	}
-
-	balanceIntesities( dcFilterRed.w, dcFilterIR.w );
-
-
-	result.heartBPM = currentBPM;
-	result.irCardiogram = lpbFilterIR.result;
-	result.irDcValue = dcFilterIR.w;
-	result.redDcValue = dcFilterRed.w;
-	result.lastBeatThreshold = lastBeatThreshold;
-	result.dcFilteredIR = dcFilterIR.result;
-	result.dcFilteredRed = dcFilterRed.result;
-
-	return result;
-}
+//	balanceIntesities( dcFilterRed.w, dcFilterIR.w );
+//
+//
+//	result.heartBPM = currentBPM;
+//	result.irCardiogram = lpbFilterIR.result;
+//	result.irDcValue = dcFilterIR.w;
+//	result.redDcValue = dcFilterRed.w;
+//	result.lastBeatThreshold = lastBeatThreshold;
+//	result.dcFilteredIR = dcFilterIR.result;
+//	result.dcFilteredRed = dcFilterRed.result;
+//
+//	return result;
+//}
 
 
 bool detectPulse(float sensor_value) {

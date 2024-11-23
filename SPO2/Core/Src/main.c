@@ -30,6 +30,7 @@
 #include "string.h"
 #include <stdio.h>
 #include "chart.h"
+#include "filter.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,6 +57,8 @@ volatile uint8_t pulseOximiterIntFlag = 0;
 #define MOVING_AVG_LENGTH 2    // Length of the moving average buffer
 #define ALPHA 0.95f // High-pass filter coefficient
 #define M 10 // Size of the buffer
+#define DATA_LENGTH  1000  // Length of dataBuffer
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,10 +66,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C2_Init(void);
 /* USER CODE BEGIN PFP */
-void Display_SpO2_Update(uint32_t spo2);
-void Display_SpO2_Init(void);
 float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha);
-void highPassFilterWithBuffer(float input, float *inputBuffer, float *outputBuffer, float *filteredSample, float alpha) ;
 float mean(const float *buffer, uint16_t size);
 /* USER CODE END PFP */
 
@@ -124,8 +124,11 @@ int main(void)
   // High-pass filter state variables
   float prevInput = 0.0f, prevOutput = 0.0f;
   float buffer[M] = {0};
-  int i = 0;
-  int filled = 0;
+  int i = 0, j = 0;
+  int filled = 0, filled2 = 0;
+  uint32_t R[DATA_LENGTH] = {0};
+  uint32_t R_count = 0;
+  float bufferDetectPeak[DATA_LENGTH] = {0};
 
 
   /* USER CODE END 2 */
@@ -157,6 +160,25 @@ int main(void)
 				  } else if (filled) {
 					  float output = mean(buffer, M);
 					  update_chart_with_gain(output);
+
+					  if (j < DATA_LENGTH) {
+						  bufferDetectPeak[j] = output;
+					  	  j++;
+					  	  if (j == DATA_LENGTH) {
+					  		  filled2 = 1;
+					  	  }
+					  } else if (filled2){
+						  findPeaks(bufferDetectPeak, DATA_LENGTH, R, &R_count);
+
+						  update_SPO2(R[1]);
+
+						  filled2 = 0;
+						  j = 0;
+						  R_count= 0;
+
+						  memset(bufferDetectPeak, 0, sizeof(bufferDetectPeak));
+						  memset(R, 0, sizeof(R));
+					  }
 
 					  // Shift buffer elements
 					  for (int j = 0; j < M - 1; j++) {
@@ -336,13 +358,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 }
 
-//float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha) {
-//    // Apply the high-pass filter formula
-//    float output = alpha * (*prevOutput + input - *prevInput);
-//    *prevInput = input;     // Update previous input
-//    *prevOutput = output;   // Update previous output
-//    return output;
-//}
 // High-pass filter function
 float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha) {
     float inputF = input; // No need to cast, input is already float
@@ -377,38 +392,6 @@ void highPassFilterWithBuffer(float input, float *inputBuffer, float *outputBuff
 
     // Advance the circular buffer index
     index = (index + 1) % FILTER_LENGTH;
-}
-void highPassFilterWithBufferAndMovingAvg(float input, float *inputBuffer, float *outputBuffer,
-                                          float *filteredSample, float alpha,
-                                          float *movingAvgBuffer, float *smoothedSample) {
-    static int index = 0;                // Circular buffer index for high-pass filter
-    static int movingAvgIndex = 0;       // Circular buffer index for moving average
-    static float movingAvgSum = 0.0f;    // Sum of moving average buffer for efficiency
-
-    // Add new input to the high-pass filter input buffer (circular behavior)
-    inputBuffer[index] = input;
-
-    // Compute the high-pass filter output
-    int prevIndex = (index - 1 + FILTER_LENGTH) % FILTER_LENGTH; // Previous index in circular buffer
-    outputBuffer[index] = alpha * (outputBuffer[prevIndex] + inputBuffer[index] - inputBuffer[prevIndex]);
-
-//    printf("High-Pass Filter Output: %f\n", outputBuffer[index]);
-
-
-    // Store the current high-pass filtered sample
-    *filteredSample = outputBuffer[index];
-
-    // Add the filtered output to the moving average buffer
-    movingAvgSum -= movingAvgBuffer[movingAvgIndex]; // Remove the oldest value from the sum
-    movingAvgBuffer[movingAvgIndex] = outputBuffer[index]; // Add the new value to the buffer
-    movingAvgSum += movingAvgBuffer[movingAvgIndex]; // Update the sum with the new value
-
-    // Compute the moving average
-    *smoothedSample = movingAvgSum / MOVING_AVG_LENGTH;
-
-    // Update the indices for both buffers
-    index = (index + 1) % FILTER_LENGTH;
-    movingAvgIndex = (movingAvgIndex + 1) % MOVING_AVG_LENGTH;
 }
 /* USER CODE END 4 */
 

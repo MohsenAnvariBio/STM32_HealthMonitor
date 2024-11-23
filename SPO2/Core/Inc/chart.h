@@ -12,6 +12,7 @@
 extern "C" {
 #endif
 	void update_chart_with_gain(float output);
+	void update_SPO2(uint32_t spo2);
 	void setup_ui(void);
 	bool event_handler(lv_event_t * e);
 
