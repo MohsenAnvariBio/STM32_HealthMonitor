@@ -162,15 +162,21 @@ int main(void)
 					  update_chart_with_gain(output);
 
 					  if (j < DATA_LENGTH) {
-						  bufferDetectPeak[j] = output;
+						  bufferDetectPeak[j] = -output/40;
+//						  printf('%.2f', bufferDetectPeak[j]);
 					  	  j++;
 					  	  if (j == DATA_LENGTH) {
 					  		  filled2 = 1;
 					  	  }
 					  } else if (filled2){
-						  findPeaks(bufferDetectPeak, DATA_LENGTH, R, &R_count);
+						  //If the following problems happen during compiling by STM32CubeIDE, go to "Project > Properties > C/C++ Build > Settings > Tool Settings > MCU Settings" and then check the box "Use float with printf from newlib-nano (-u _printf_float)."
+//						  printf('%.2f', bufferDetectPeak);
 
-						  update_SPO2(R[1]);
+
+						  findPeaks(bufferDetectPeak, DATA_LENGTH, R, &R_count);
+						  update_SPO2(calculateMean(bufferDetectPeak, DATA_LENGTH));
+						  update_HR(heartRate(R, R_count));
+
 
 						  filled2 = 0;
 						  j = 0;

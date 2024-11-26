@@ -16,6 +16,7 @@ static lv_chart_series_t *ser2; // Chart series
 lv_obj_t * label_t;
 bool use_moving_average = false;
 lv_obj_t *labelspo2;
+lv_obj_t *labelHR;
 
 
 // Increment event callback
@@ -43,11 +44,21 @@ void update_chart_with_gain(float output) {
     lv_chart_set_next_value(chart, ser2, (-output / gain) );
 }
 
-void update_SPO2(uint32_t spo2) {
+void update_SPO2(float spo2) {
+//    char buffer[20];  // Ensure the buffer is large enough to hold the text
+//    snprintf(buffer, sizeof(buffer), "SpO2: %u%%", spo2);  // Convert the value to a string
+//    lv_label_set_text(labelspo2, buffer);  // Update the label text with the formatted string
     char buffer[20];  // Ensure the buffer is large enough to hold the text
-    snprintf(buffer, sizeof(buffer), "SpO2: %u%%", spo2);  // Convert the value to a string
+    snprintf(buffer, sizeof(buffer), "SpO2: %0.2f", spo2);  // Convert the value to a string
     lv_label_set_text(labelspo2, buffer);  // Update the label text with the formatted string
 }
+
+void update_HR(uint32_t hr) {
+    char buffer[20];  // Ensure the buffer is large enough to hold the text
+    snprintf(buffer, sizeof(buffer), "HR: %u", hr);  // Convert the value to a string
+    lv_label_set_text(labelHR, buffer);  // Update the label text with the formatted string
+}
+
 
 void switch_event_handler(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
@@ -127,7 +138,11 @@ void setup_ui(void) {
 
     labelspo2 = lv_label_create(lv_scr_act());
     lv_label_set_text(labelspo2, "SpO2: --%"); // Initial text
-    lv_obj_align(labelspo2, LV_ALIGN_CENTER, 0, 0); // Center align
+    lv_obj_align_to(labelspo2, chart, LV_ALIGN_CENTER, 0, 85);
+
+    labelHR = lv_label_create(lv_scr_act());
+    lv_label_set_text(labelHR, "HR: --"); // Initial text
+    lv_obj_align_to(labelHR, chart, LV_ALIGN_CENTER, 0, 105);
 
 
 }
