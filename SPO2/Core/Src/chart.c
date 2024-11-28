@@ -17,10 +17,14 @@ lv_obj_t * label_t;
 bool use_moving_average = false;
 lv_obj_t *labelspo2;
 lv_obj_t *labelHR;
+lv_obj_t *labelTE;
 
+#define COLOR_BACKGND lv_color_make(131, 165, 133)
+#define COLOR_FONT lv_color_make(0x00, 0x0, 0x00)
+LV_FONT_DECLARE(lv_font_montserrat_20); // Modern medium-sized font for labels
 
 // Increment event callback
-static void lv_spinbox_increment_event_cb(lv_event_t *e) {
+static void lv_spinbox_decrement_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_LONG_PRESSED_REPEAT) {
         lv_spinbox_increment(spinbox);
@@ -28,12 +32,14 @@ static void lv_spinbox_increment_event_cb(lv_event_t *e) {
 }
 
 // Decrement event callback
-static void lv_spinbox_decrement_event_cb(lv_event_t *e) {
+static void lv_spinbox_increment_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_LONG_PRESSED_REPEAT) {
         lv_spinbox_decrement(spinbox);
     }
 }
+
+
 
 // Function to update the chart dynamically
 void update_chart_with_gain(float output) {
@@ -49,13 +55,13 @@ void update_SPO2(float spo2) {
 //    snprintf(buffer, sizeof(buffer), "SpO2: %u%%", spo2);  // Convert the value to a string
 //    lv_label_set_text(labelspo2, buffer);  // Update the label text with the formatted string
     char buffer[20];  // Ensure the buffer is large enough to hold the text
-    snprintf(buffer, sizeof(buffer), "SpO2: %0.2f", spo2);  // Convert the value to a string
+    snprintf(buffer, sizeof(buffer), "%0.2f", spo2);  // Convert the value to a string
     lv_label_set_text(labelspo2, buffer);  // Update the label text with the formatted string
 }
 
 void update_HR(uint32_t hr) {
     char buffer[20];  // Ensure the buffer is large enough to hold the text
-    snprintf(buffer, sizeof(buffer), "HR: %u", hr);  // Convert the value to a string
+    snprintf(buffer, sizeof(buffer), "%d", hr);  // Convert the value to a string
     lv_label_set_text(labelHR, buffer);  // Update the label text with the formatted string
 }
 
@@ -67,84 +73,190 @@ void switch_event_handler(lv_event_t *e) {
         use_moving_average = lv_obj_has_state(obj, LV_STATE_CHECKED);
         // Update the chart series color based on `use_moving_average`
         if (use_moving_average) {
-            lv_chart_set_series_color(chart, ser2, lv_palette_main(LV_PALETTE_GREEN)); // Set to green
+            lv_chart_set_series_color(chart, ser2, COLOR_FONT); // Set to green
         } else {
-            lv_chart_set_series_color(chart, ser2, lv_palette_main(LV_PALETTE_RED));  // Set to blue
+            lv_chart_set_series_color(chart, ser2, COLOR_FONT);  // Set to blue
         }
     }
 }
 bool is_moving_average_enabled() {
     return use_moving_average;
 }
+
 // Spinbox and chart example initialization
 void setup_ui(void) {
+	 // Set screen background color
+	    lv_obj_set_style_bg_color(lv_scr_act(), COLOR_BACKGND, 0);
 
-	// Title
-	lv_obj_t *label_t = lv_label_create(lv_scr_act());
-	lv_label_set_long_mode(label_t, LV_LABEL_LONG_WRAP);     /* Break the long lines if needed */
-	lv_label_set_recolor(label_t, true);                    /* Enable re-coloring by commands in the text */
-	lv_label_set_text(label_t, "#0000ff SPO2 Measurement#"); /* Title text with blue color */
-	lv_obj_set_style_text_font(label_t, &lv_font_montserrat_22, LV_PART_MAIN); /* Larger, modern font */
-	lv_obj_set_style_text_color(label_t, lv_color_hex(0xff0000), LV_PART_MAIN); /* Add a secondary color (red for title text) */
-	lv_obj_set_style_text_align(label_t, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);   /* Center the text alignment */
-	lv_obj_align(label_t, LV_ALIGN_TOP_MID, 0, 2); /* Adjust alignment and position */
+	    // Title Label
+	    lv_obj_t *label_t = lv_label_create(lv_scr_act());
+	    lv_label_set_text(label_t, "HEALTH MONITOR");
+	    lv_obj_set_style_text_font(label_t, &lv_font_montserrat_22, 0);
+	    lv_obj_set_style_text_color(label_t, COLOR_FONT, 0);
+	    lv_obj_align(label_t, LV_ALIGN_TOP_MID, 0, 6);
 
-    // Create a chart
-    chart = lv_chart_create(lv_scr_act());
-	lv_obj_set_size(chart, 310, 120);
-	lv_obj_align_to(chart, label_t, LV_ALIGN_TOP_MID,0,25);
-	lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_CIRCULAR);
-	lv_chart_set_type(chart, LV_CHART_TYPE_LINE);   /*Show lines and points too*/
-	lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -200, 200);
-	lv_chart_set_point_count(chart, 1000);
-    ser2 = lv_chart_add_series(chart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
-    lv_chart_set_div_line_count(chart, 10, 8); // 10 divisions for X-axis, 8 divisions for Y-axis
+	    // Create a chart
+	    chart = lv_chart_create(lv_scr_act());
+	    lv_obj_set_size(chart, 340, 120);
+	    lv_obj_align_to(chart, label_t, LV_ALIGN_OUT_BOTTOM_MID, 0, 6);
+	    lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_CIRCULAR);
+	    lv_chart_set_type(chart, LV_CHART_TYPE_LINE);
+	    lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -200, 200);
+	    lv_chart_set_point_count(chart, 1000);
+	    lv_chart_set_div_line_count(chart, 10, 12);
+	    ser2 = lv_chart_add_series(chart, COLOR_FONT, LV_CHART_AXIS_PRIMARY_Y);
 
-    // Create a spinbox
-	spinbox = lv_spinbox_create(lv_scr_act());
-	lv_spinbox_set_range(spinbox, 1, 100); // Set the gain range
-	lv_spinbox_set_digit_format(spinbox, 1, 0);
-	lv_spinbox_set_value(spinbox, 40); // Default gain value
-	lv_obj_set_width(spinbox, 0);
-	lv_obj_set_height(spinbox, 20);
-	lv_obj_align_to(spinbox, chart, LV_ALIGN_TOP_RIGHT, -20, 85);
-	lv_coord_t h = lv_obj_get_height(spinbox);
+	    // Set chart background color
+	    lv_obj_set_style_bg_color(chart, COLOR_BACKGND, LV_PART_MAIN | LV_STATE_DEFAULT);
+	    lv_obj_set_style_bg_opa(chart, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+	    lv_obj_set_style_border_color(chart, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN | LV_STATE_DEFAULT);
+	    lv_obj_set_style_border_width(chart, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+	    lv_obj_set_style_border_opa(chart, LV_OPA_50, LV_PART_MAIN | LV_STATE_DEFAULT);
+	    lv_obj_set_style_radius(chart, 10, LV_PART_MAIN | LV_STATE_DEFAULT); // Rounded corners
 
-	// Add a "+" button for incrementing the spinbox
-	lv_obj_t *btn = lv_btn_create(lv_scr_act());
-	lv_obj_set_size(btn, h, h);
-	lv_obj_align_to(btn, spinbox, LV_ALIGN_OUT_RIGHT_MID, 1, 0);
-	lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_MINUS, 0);
-	lv_obj_add_event_cb(btn, lv_spinbox_increment_event_cb, LV_EVENT_ALL, NULL);
+	    // Create a top border line
+	    static lv_point_t top_line_points[] = {{0, 0}, {320, 0}};
+	    lv_obj_t *top_line = lv_line_create(lv_scr_act());
+	    lv_line_set_points(top_line, top_line_points, 2); // Set points
+	    lv_obj_set_style_line_color(top_line,COLOR_FONT , 0);
+	    lv_obj_set_style_line_width(top_line, 1, 0);
+	    lv_obj_align_to(top_line, chart, LV_ALIGN_TOP_MID, 0, -10); // Position above the chart
 
-	// Add a "-" button for decrementing the spinbox
-	btn = lv_btn_create(lv_scr_act());
-	lv_obj_set_size(btn, h, h);
-	lv_obj_align_to(btn, spinbox, LV_ALIGN_OUT_LEFT_MID, -5, 0);
-	lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_PLUS, 0);
-	lv_obj_add_event_cb(btn, lv_spinbox_decrement_event_cb, LV_EVENT_ALL, NULL);
+	    // Create a bottom border line
+	    static lv_point_t bottom_line_points[] = {{0, 0}, {320, 0}};
+	    lv_obj_t *bottom_line = lv_line_create(lv_scr_act());
+	    lv_line_set_points(bottom_line, bottom_line_points, 2); // Set points
+	    lv_obj_set_style_line_color(bottom_line, COLOR_FONT, 0);
+	    lv_obj_set_style_line_width(bottom_line, 1, 0);
+	    lv_obj_align_to(bottom_line, chart, LV_ALIGN_BOTTOM_MID, 0, 10); // Position below the chart
 
-    // Create the switch
-    lv_obj_t *sw = lv_switch_create(lv_scr_act());
-    lv_obj_set_size(sw, 40, 20);
-    lv_obj_align(sw, LV_ALIGN_TOP_RIGHT, -10, 10); // Align switch on screen
-    lv_obj_align_to(sw, chart, LV_ALIGN_TOP_LEFT, +30, 85);
-    lv_obj_add_event_cb(sw, switch_event_handler, LV_EVENT_ALL, NULL);
 
-    // Optionally, add a label for the switch
-    lv_obj_t *label = lv_label_create(lv_scr_act());
-    lv_label_set_text(label, "MA");
-    lv_obj_align_to(label, sw, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+	    // Spinbox
+	    spinbox = lv_spinbox_create(lv_scr_act());
+	    lv_spinbox_set_range(spinbox, 1, 100);
+	    lv_spinbox_set_digit_format(spinbox, 1, 0);
+	    lv_spinbox_set_value(spinbox, 40);
+	    lv_obj_set_width(spinbox, 0);
+	    lv_obj_align_to(spinbox, chart, LV_ALIGN_OUT_RIGHT_TOP, -50, 85);
 
-    labelspo2 = lv_label_create(lv_scr_act());
-    lv_label_set_text(labelspo2, "SpO2: --%"); // Initial text
-    lv_obj_align_to(labelspo2, chart, LV_ALIGN_CENTER, 0, 85);
+	    // Common Style for Buttons
+	    static lv_style_t btn_style;
+	    lv_style_init(&btn_style);
+	    lv_style_set_bg_color(&btn_style, COLOR_FONT); // Light green color
+	    lv_style_set_bg_opa(&btn_style, LV_OPA_COVER);                  // Full opacity
+	    lv_style_set_radius(&btn_style, 8);                             // Rounded corners
+	    lv_style_set_border_width(&btn_style, 2);                       // Border width
+	    lv_style_set_border_color(&btn_style, lv_color_make(0, 0, 0));  // Black border
+	    lv_style_set_text_color(&btn_style, lv_color_white());          // Black text for label
 
-    labelHR = lv_label_create(lv_scr_act());
-    lv_label_set_text(labelHR, "HR: --"); // Initial text
-    lv_obj_align_to(labelHR, chart, LV_ALIGN_CENTER, 0, 105);
+	    // "+" Button
+	    lv_obj_t *btn_plus = lv_btn_create(lv_scr_act());
+	    lv_obj_add_style(btn_plus, &btn_style, LV_PART_MAIN);           // Apply style
+	    lv_obj_set_size(btn_plus, 40, 20);
+	    lv_obj_align_to(btn_plus, spinbox, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
+	    lv_obj_add_event_cb(btn_plus, lv_spinbox_increment_event_cb, LV_EVENT_ALL, NULL);
+	    lv_obj_t *btn_plus_label = lv_label_create(btn_plus);
+	    lv_label_set_text(btn_plus_label, "+");
+	    lv_obj_set_style_text_font(btn_plus_label, &lv_font_montserrat_22, 0);
+	    lv_obj_center(btn_plus_label);
+
+	    // "-" Button
+	    lv_obj_t *btn_minus = lv_btn_create(lv_scr_act());
+	    lv_obj_add_style(btn_minus, &btn_style, LV_PART_MAIN);          // Apply style
+	    lv_obj_set_size(btn_minus, 40, 20);
+	    lv_obj_align_to(btn_minus, spinbox, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+	    lv_obj_add_event_cb(btn_minus, lv_spinbox_decrement_event_cb, LV_EVENT_ALL, NULL);
+	    lv_obj_t *btn_minus_label = lv_label_create(btn_minus);
+	    lv_label_set_text(btn_minus_label, "-");
+	    lv_obj_set_style_text_font(btn_minus_label, &lv_font_montserrat_22, 0); // Slightly smaller font
+//	    lv_obj_center(btn_minus_label);
+	    lv_obj_align(btn_minus_label, LV_ALIGN_CENTER, 0, -2);
+
+	    // Switch
+	    lv_obj_t *sw = lv_switch_create(lv_scr_act());
+	    lv_obj_set_size(sw, 40, 20);
+	    lv_obj_align(sw, LV_ALIGN_TOP_RIGHT, -10, 10); // Align switch on screen
+	    lv_obj_align_to(sw, chart, LV_ALIGN_TOP_LEFT, +30, 85);
+	    lv_obj_add_event_cb(sw, switch_event_handler, LV_EVENT_ALL, NULL);
+	    lv_obj_set_style_bg_color(sw, COLOR_FONT, LV_PART_INDICATOR | LV_STATE_CHECKED);
+	    lv_obj_set_style_bg_opa(sw, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_CHECKED);
+	    // Optionally, add a label for the switch
+	    lv_obj_t *label = lv_label_create(lv_scr_act());
+	    lv_label_set_text(label, "MA");
+	    lv_obj_align_to(label, sw, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+
+	    // Container for SpO2 Label
+	    lv_obj_t *container_spo2 = lv_obj_create(lv_scr_act());
+	    lv_obj_set_size(container_spo2, 90, 70);
+	    lv_obj_align_to(container_spo2, chart, LV_ALIGN_OUT_BOTTOM_LEFT, 10, 10); // Position below the chart
+	    lv_obj_set_style_radius(container_spo2, 10, 0); // Rounded corners
+	    lv_obj_set_style_bg_color(container_spo2, COLOR_BACKGND, 0); // Light green background
+	    lv_obj_set_style_border_color(container_spo2, COLOR_FONT, 0); // Black border
+	    lv_obj_set_style_border_width(container_spo2, 2, 0);
+	    // SpO2 Fixed Text
+	    lv_obj_t *label_spo2_fixed = lv_label_create(container_spo2);
+	    lv_label_set_text(label_spo2_fixed, "SPO2");
+	    lv_obj_set_style_text_font(label_spo2_fixed, &lv_font_montserrat_16, 0); // Slightly smaller font
+	    lv_obj_set_style_text_color(label_spo2_fixed, COLOR_FONT, 0); // Black text
+	    lv_obj_align(label_spo2_fixed, LV_ALIGN_TOP_MID, 0, -10); // Align near the top
+	    // SpO2 Changing Text
+	    labelspo2 = lv_label_create(container_spo2);
+	    lv_label_set_text(labelspo2, "--%");
+	    lv_obj_set_style_text_font(labelspo2, &lv_font_montserrat_28, 0); // Larger font for dynamic data
+	    lv_obj_set_style_text_color(labelspo2, COLOR_FONT, 0); // Black text
+	    lv_obj_align(labelspo2, LV_ALIGN_CENTER, 0, 5); // Align near the bottom
+
+	    // Container for Heart Rate Label
+	    lv_obj_t *container_hr = lv_obj_create(lv_scr_act());
+	    lv_obj_set_size(container_hr, 90, 70);
+	    lv_obj_align_to(container_hr, chart, LV_ALIGN_OUT_BOTTOM_MID, 0, 10); // Position below SpO2 container
+	    lv_obj_set_style_radius(container_hr, 10, 0); // Rounded corners
+	    lv_obj_set_style_bg_color(container_hr, COLOR_BACKGND, 0); // Light green background
+	    lv_obj_set_style_border_color(container_hr, COLOR_FONT, 0); // Black border
+	    lv_obj_set_style_border_width(container_hr, 2, 0);
+
+	    // HR Fixed Text
+	    lv_obj_t *label_hr_fixed = lv_label_create(container_hr);
+	    lv_label_set_text(label_hr_fixed, "HR");
+	    lv_obj_set_style_text_font(label_hr_fixed, &lv_font_montserrat_16, 0); // Slightly smaller font
+	    lv_obj_set_style_text_color(label_hr_fixed, COLOR_FONT, 0); // Black text
+	    lv_obj_align(label_hr_fixed, LV_ALIGN_TOP_MID, 0, -10); // Align near the top
+
+	    // HR Changing Text
+	    labelHR = lv_label_create(container_hr);
+	    lv_label_set_text(labelHR, "--");
+	    lv_obj_set_style_text_font(labelHR, &lv_font_montserrat_28, 0); // Larger font for dynamic data
+	    lv_obj_set_style_text_color(labelHR, COLOR_FONT, 0); // Black text
+	    lv_obj_align(labelHR, LV_ALIGN_CENTER, 0, 5); // Align near the bottom
+
+	    // Container for Temperature Label
+	    lv_obj_t *container_te = lv_obj_create(lv_scr_act());
+	    lv_obj_set_size(container_te, 90, 70);
+	    lv_obj_align_to(container_te, chart, LV_ALIGN_OUT_BOTTOM_RIGHT, -10, 10); // Position below SpO2 container
+	    lv_obj_set_style_radius(container_te, 10, 0); // Rounded corners
+	    lv_obj_set_style_bg_color(container_te, COLOR_BACKGND, 0); // Light green background
+	    lv_obj_set_style_border_color(container_te, COLOR_FONT, 0); // Black border
+	    lv_obj_set_style_border_width(container_te, 2, 0);
+
+	    // TEMP Fixed Text
+	    lv_obj_t *label_temp_fixed = lv_label_create(container_te);
+	    lv_label_set_text(label_temp_fixed, "TEMP");
+	    lv_obj_set_style_text_font(label_temp_fixed, &lv_font_montserrat_16, 0); // Slightly smaller font
+	    lv_obj_set_style_text_color(label_temp_fixed, COLOR_FONT, 0); // Black text
+	    lv_obj_align(label_temp_fixed, LV_ALIGN_TOP_MID, 0, -10); // Align near the top
+
+	    // TEMP Changing Text
+	    labelTE = lv_label_create(container_te);
+	    lv_label_set_text(labelTE, "20");
+	    lv_obj_set_style_text_font(labelTE, &lv_font_montserrat_28, 0); // Larger font for dynamic data
+	    lv_obj_set_style_text_color(labelTE, COLOR_FONT, 0); // Black text
+	    lv_obj_align(labelTE, LV_ALIGN_CENTER, 0, 5); // Align near the bottom
+
 
 
 }
+
+
+
 
 #endif

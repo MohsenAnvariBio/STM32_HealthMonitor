@@ -56,7 +56,7 @@ volatile uint8_t pulseOximiterIntFlag = 0;
 #define FILTER_LENGTH 5       // Length of the high-pass filter buffer
 #define MOVING_AVG_LENGTH 2    // Length of the moving average buffer
 #define ALPHA 0.95f // High-pass filter coefficient
-#define M 10 // Size of the buffer
+#define M 12 // Size of the buffer
 #define DATA_LENGTH  1000  // Length of dataBuffer
 
 /* USER CODE END PV */
