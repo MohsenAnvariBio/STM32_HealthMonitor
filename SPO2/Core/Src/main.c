@@ -122,14 +122,17 @@ int main(void)
   pulseOximeter_setMeasurementMode(SPO2);
 
   // High-pass filter state variables
-  float prevInput = 0.0f, prevOutput = 0.0f;
-  float buffer[M] = {0};
+  float prevInput_ir = 0.0f, prevOutput_ir = 0.0f;
+  float prevInput_red = 0.0f, prevOutput_red = 0.0f;
+  float buffer_ir[M] = {0};
+  float buffer_red[M] = {0};
   int i = 0, j = 0;
   int filled = 0, filled2 = 0;
   uint32_t R[DATA_LENGTH] = {0};
   uint32_t R_count = 0;
-  float bufferDetectPeak[DATA_LENGTH] = {0};
-
+  float bufferPeakDet_ir[DATA_LENGTH] = {0};
+  float bufferPeakDet_red[DATA_LENGTH] = {0};
+  float SpO2 = 0, ratio = 0;
 
   /* USER CODE END 2 */
 
@@ -144,57 +147,73 @@ int main(void)
 		  if (pulseOximiterIntFlag) {
 			  pulseOximiterIntFlag = 0;
 			  fifoLedData = pulseOximeter_readFifo();
-			  float ppg_signal = (float)fifoLedData.irLedRaw;
+			  float ppg_signalir = (float)fifoLedData.irLedRaw;
+			  float ppg_signalred = (float)fifoLedData.redLedRaw;
 
 			  // High-pass filter
-			  float ppg_signal_rdc = highPassFilter(ppg_signal, &prevInput, &prevOutput, 0.95f);
+			  float ppg_signal_ir_dc = highPassFilter(ppg_signalir, &prevInput_ir, &prevOutput_ir, 0.95f);
+			  float ppg_signal_red_dc = highPassFilter(ppg_signalred, &prevInput_red, &prevOutput_red, 0.95f);
 
 			  if (is_moving_average_enabled()) {
 				  // Moving average enabled
 				  if (i < M) {
-					  buffer[i] = ppg_signal_rdc;
+					  buffer_ir[i] = ppg_signal_ir_dc;
+					  buffer_red[i] = ppg_signal_red_dc;
 					  i++;
 					  if (i == M) {
 						  filled = 1;
 					  }
 				  } else if (filled) {
-					  float output = mean(buffer, M);
-					  update_chart_with_gain(output);
+					  float ma_ir = mean(buffer_ir, M);
+					  float ma_red = mean(buffer_red, M);
+					  update_chart_with_gain(ma_ir);
 
 					  if (j < DATA_LENGTH) {
-						  bufferDetectPeak[j] = -output/40;
-//						  printf('%.2f', bufferDetectPeak[j]);
+						  bufferPeakDet_ir[j] = -ma_ir/40;
+						  bufferPeakDet_red[j] = -ma_red/40;
 					  	  j++;
 					  	  if (j == DATA_LENGTH) {
 					  		  filled2 = 1;
 					  	  }
 					  } else if (filled2){
 						  //If the following problems happen during compiling by STM32CubeIDE, go to "Project > Properties > C/C++ Build > Settings > Tool Settings > MCU Settings" and then check the box "Use float with printf from newlib-nano (-u _printf_float)."
-//						  printf('%.2f', bufferDetectPeak);
+//						  printf('%.2f', bufferPeakDet_ir);
 
-
-						  findPeaks(bufferDetectPeak, DATA_LENGTH, R, &R_count);
-						  update_SPO2(calculateMean(bufferDetectPeak, DATA_LENGTH));
-						  update_HR(heartRate(R, R_count));
-
-
+						  if(isFingerDetected(bufferPeakDet_ir, DATA_LENGTH)){
+							  findPeaks(bufferPeakDet_ir, DATA_LENGTH, R, &R_count);
+							  calculateSpO2(bufferPeakDet_red, bufferPeakDet_ir, DATA_LENGTH, &SpO2, &ratio);
+						        if (SpO2 > 100.0) {
+						            SpO2 = 100.0; // Clamp to a realistic maximum
+						        } else if (SpO2 < 0.0) {
+						            SpO2 = 0.0; // Clamp to a realistic minimum
+						        }
+							  update_SPO2((uint32_t)SpO2);
+							  update_HR(heartRate(R, R_count));
+						  }else{
+							  update_SPO2((uint32_t)0);
+							  update_HR(0);
+						  }
 						  filled2 = 0;
 						  j = 0;
 						  R_count= 0;
+						  SpO2 = 0;
 
-						  memset(bufferDetectPeak, 0, sizeof(bufferDetectPeak));
+						  memset(bufferPeakDet_ir, 0, sizeof(bufferPeakDet_ir));
+						  memset(bufferPeakDet_red, 0, sizeof(bufferPeakDet_red));
 						  memset(R, 0, sizeof(R));
 					  }
 
 					  // Shift buffer elements
 					  for (int j = 0; j < M - 1; j++) {
-						  buffer[j] = buffer[j + 1];
+						  buffer_ir[j] = buffer_ir[j + 1];
+						  buffer_red[j] = buffer_red[j + 1];
 					  }
-					  buffer[M - 1] = ppg_signal_rdc;
+					  buffer_ir[M - 1] = ppg_signal_ir_dc;
+					  buffer_red[M - 1] = ppg_signal_red_dc;
 				  }
 			  } else {
 				  // Only high-pass filter
-				  update_chart_with_gain(ppg_signal_rdc);
+				  update_chart_with_gain(ppg_signal_ir_dc);
 			  }
 
 			  pulseOximeter_clearInterrupt();

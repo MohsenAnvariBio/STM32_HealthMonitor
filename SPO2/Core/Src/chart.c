@@ -50,12 +50,12 @@ void update_chart_with_gain(float output) {
     lv_chart_set_next_value(chart, ser2, (-output / gain) );
 }
 
-void update_SPO2(float spo2) {
+void update_SPO2(uint32_t spo2) {
 //    char buffer[20];  // Ensure the buffer is large enough to hold the text
 //    snprintf(buffer, sizeof(buffer), "SpO2: %u%%", spo2);  // Convert the value to a string
 //    lv_label_set_text(labelspo2, buffer);  // Update the label text with the formatted string
     char buffer[20];  // Ensure the buffer is large enough to hold the text
-    snprintf(buffer, sizeof(buffer), "%0.2f", spo2);  // Convert the value to a string
+    snprintf(buffer, sizeof(buffer), "%d", spo2);  // Convert the value to a string
     lv_label_set_text(labelspo2, buffer);  // Update the label text with the formatted string
 }
 
@@ -83,7 +83,6 @@ bool is_moving_average_enabled() {
     return use_moving_average;
 }
 
-// Spinbox and chart example initialization
 void setup_ui(void) {
 	 // Set screen background color
 	    lv_obj_set_style_bg_color(lv_scr_act(), COLOR_BACKGND, 0);
@@ -199,9 +198,16 @@ void setup_ui(void) {
 	    lv_obj_set_style_text_font(label_spo2_fixed, &lv_font_montserrat_16, 0); // Slightly smaller font
 	    lv_obj_set_style_text_color(label_spo2_fixed, COLOR_FONT, 0); // Black text
 	    lv_obj_align(label_spo2_fixed, LV_ALIGN_TOP_MID, 0, -10); // Align near the top
+
+	    lv_obj_t *label_spo2_unit = lv_label_create(container_spo2);
+	    lv_label_set_text(label_spo2_unit, "%");
+	    lv_obj_set_style_text_font(label_spo2_unit, &lv_font_montserrat_16, 0); // Slightly smaller font
+	    lv_obj_set_style_text_color(label_spo2_unit, COLOR_FONT, 0); // Black text
+	    lv_obj_align(label_spo2_unit, LV_ALIGN_BOTTOM_RIGHT, 10, 12); // Align near the top
+
 	    // SpO2 Changing Text
 	    labelspo2 = lv_label_create(container_spo2);
-	    lv_label_set_text(labelspo2, "--%");
+	    lv_label_set_text(labelspo2, "--");
 	    lv_obj_set_style_text_font(labelspo2, &lv_font_montserrat_28, 0); // Larger font for dynamic data
 	    lv_obj_set_style_text_color(labelspo2, COLOR_FONT, 0); // Black text
 	    lv_obj_align(labelspo2, LV_ALIGN_CENTER, 0, 5); // Align near the bottom
@@ -221,6 +227,12 @@ void setup_ui(void) {
 	    lv_obj_set_style_text_font(label_hr_fixed, &lv_font_montserrat_16, 0); // Slightly smaller font
 	    lv_obj_set_style_text_color(label_hr_fixed, COLOR_FONT, 0); // Black text
 	    lv_obj_align(label_hr_fixed, LV_ALIGN_TOP_MID, 0, -10); // Align near the top
+
+	    lv_obj_t *label_hr_unit = lv_label_create(container_hr);
+	    lv_label_set_text(label_hr_unit, "bpm");
+	    lv_obj_set_style_text_font(label_hr_unit, &lv_font_montserrat_16, 0); // Slightly smaller font
+	    lv_obj_set_style_text_color(label_hr_unit, COLOR_FONT, 0); // Black text
+	    lv_obj_align(label_hr_unit, LV_ALIGN_BOTTOM_RIGHT, 10, 12); // Align near the top
 
 	    // HR Changing Text
 	    labelHR = lv_label_create(container_hr);
@@ -244,6 +256,12 @@ void setup_ui(void) {
 	    lv_obj_set_style_text_font(label_temp_fixed, &lv_font_montserrat_16, 0); // Slightly smaller font
 	    lv_obj_set_style_text_color(label_temp_fixed, COLOR_FONT, 0); // Black text
 	    lv_obj_align(label_temp_fixed, LV_ALIGN_TOP_MID, 0, -10); // Align near the top
+
+	    lv_obj_t *label_temp_unit = lv_label_create(container_te);
+	    lv_label_set_text(label_temp_unit, "\u00B0C");
+	    lv_obj_set_style_text_font(label_temp_unit, &lv_font_montserrat_16, 0); // Slightly smaller font
+	    lv_obj_set_style_text_color(label_temp_unit, COLOR_FONT, 0); // Black text
+	    lv_obj_align(label_temp_unit, LV_ALIGN_BOTTOM_RIGHT, 10, 12); // Align near the top
 
 	    // TEMP Changing Text
 	    labelTE = lv_label_create(container_te);

@@ -15,10 +15,17 @@
 #include "stm32f4xx_hal.h"
 
 #define FS 230          // Sampling frequency
+#define FINGER_THRESHOLD_LOW 0.1f
+#define FINGER_THRESHOLD_HIGH 5.0f
+
 
 float process_ppg_signal(float ppg_signal_rdc, float *buffer, int M, int *i, int *filled);
 float calculateMean(float *array, int length);
 void findPeaks(float *dataBuffer, int length, uint32_t *R, uint32_t *R_count);
 uint16_t heartRate(uint32_t *R, int R_count);
 float calculateMedian(float *array, int count);
+uint16_t isFingerDetected(float *dataBuffer, size_t bufferSize);
+float process_ppg_signal(float ppg_signal_rdc, float *buffer, int M, int *i, int *filled);
+
+
 #endif /* __FILTER_H__ */

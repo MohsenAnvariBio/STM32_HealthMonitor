@@ -182,4 +182,48 @@ uint16_t heartRate(uint32_t *R, int R_count) {
     return HR;
 }
 
+uint16_t isFingerDetected(float *dataBuffer, size_t bufferSize) {
+    // Check for invalid inputs
+    if (dataBuffer == NULL || bufferSize == 0) {
+        return 0; // No finger detected in case of invalid input
+    }
 
+    // Calculate the mean of the data buffer
+    float meanValue = calculateMean(dataBuffer, bufferSize);
+
+    // Check if the mean value falls within the defined thresholds
+    if ((meanValue > FINGER_THRESHOLD_LOW && meanValue < FINGER_THRESHOLD_HIGH) ||
+        (meanValue < -FINGER_THRESHOLD_LOW && meanValue > -FINGER_THRESHOLD_HIGH)) {
+        return 1; // Finger detected
+    } else {
+        return 0; // No finger detected
+    }
+}
+
+
+/**
+ * Calculate SpO2 from red and IR data.
+ *
+ * @param redBuffer Array of red light PPG data
+ * @param irBuffer Array of infrared light PPG data
+ * @param length Number of samples in each buffer
+ * @param SpO2 Pointer to store the calculated SpO2 value
+ * @param ratio Pointer to store the calculated ratio (optional)
+ */
+void calculateSpO2(float *redSignal, float *irSignal, int length, float *SpO2, float *ratio) {
+    float acRed = 0, acIr = 0;
+
+    // Calculate the RMS of the signals (AC component)
+    for (int i = 0; i < length; i++) {
+        acRed += redSignal[i] * redSignal[i];
+        acIr += irSignal[i] * irSignal[i];
+    }
+    acRed = sqrt(acRed / length);
+    acIr = sqrt(acIr / length);
+
+    // Calculate the ratio of AC components
+    *ratio = acRed / acIr;
+
+    // Estimate SpO2 using the ratio
+    *SpO2 = 110.0 - 25.0 * (*ratio);  // Adjust coefficients as needed
+}
