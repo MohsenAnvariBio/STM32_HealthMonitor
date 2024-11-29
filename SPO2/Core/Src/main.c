@@ -180,16 +180,14 @@ int main(void)
 //						  printf('%.2f', bufferPeakDet_ir);
 
 						  if(isFingerDetected(bufferPeakDet_ir, DATA_LENGTH)){
+							  update_heartimg(1);
 							  findPeaks(bufferPeakDet_ir, DATA_LENGTH, R, &R_count);
 							  calculateSpO2(bufferPeakDet_red, bufferPeakDet_ir, DATA_LENGTH, &SpO2, &ratio);
-						        if (SpO2 > 100.0) {
-						            SpO2 = 100.0; // Clamp to a realistic maximum
-						        } else if (SpO2 < 0.0) {
-						            SpO2 = 0.0; // Clamp to a realistic minimum
-						        }
+							  SpO2 = (SpO2 > 100.0) ? 100.0 : (SpO2 < 0.0 ? 0.0 : SpO2);
 							  update_SPO2((uint32_t)SpO2);
 							  update_HR(heartRate(R, R_count));
 						  }else{
+							  update_heartimg(0);
 							  update_SPO2((uint32_t)0);
 							  update_HR(0);
 						  }
