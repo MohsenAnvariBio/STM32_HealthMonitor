@@ -61,29 +61,43 @@ void update_chart_with_gain(float output) {
 }
 
 void update_SPO2(uint32_t spo2) {
-//    char buffer[20];  // Ensure the buffer is large enough to hold the text
-//    snprintf(buffer, sizeof(buffer), "SpO2: %u%%", spo2);  // Convert the value to a string
-//    lv_label_set_text(labelspo2, buffer);  // Update the label text with the formatted string
-    char buffer[20];  // Ensure the buffer is large enough to hold the text
-    snprintf(buffer, sizeof(buffer), "%d", spo2);  // Convert the value to a string
-    lv_label_set_text(labelspo2, buffer);  // Update the label text with the formatted string
+	if (spo2 == NULL){
+		lv_label_set_text(labelspo2, "--");
+	}else{
+		char buffer[20];  // Ensure the buffer is large enough to hold the text
+	    snprintf(buffer, sizeof(buffer), "%d", spo2);  // Convert the value to a string
+	    lv_label_set_text(labelspo2, buffer);  // Update the label text with the formatted string
+	}
 }
 
 void update_HR(uint32_t hr) {
-    char buffer[20];  // Ensure the buffer is large enough to hold the text
-    snprintf(buffer, sizeof(buffer), "%d", hr);  // Convert the value to a string
-    lv_label_set_text(labelHR, buffer);  // Update the label text with the formatted string
+	if (hr == NULL){
+		lv_label_set_text(labelHR, "--");
+	}else{
+	    char buffer[20];  // Ensure the buffer is large enough to hold the text
+	    snprintf(buffer, sizeof(buffer), "%d", hr);  // Convert the value to a string
+	    lv_label_set_text(labelHR, buffer);  // Update the label text with the formatted string
+	}
 }
+
+void update_temp(uint32_t t) {
+	if (t == NULL){
+		lv_label_set_text(labelTE, "--");
+	}else{
+	    char buffer[20];  // Ensure the buffer is large enough to hold the text
+	    snprintf(buffer, sizeof(buffer), "%d", t);  // Convert the value to a string
+	    lv_label_set_text(labelTE, buffer);  // Update the label text with the formatted string
+	}
+}
+
 
 void update_heartimg(bool wimg) {
     static lv_obj_t *heart_img = NULL;
-
     // Create the image object only if it doesn't exist
     if (heart_img == NULL) {
         heart_img = lv_img_create(lv_scr_act());
         lv_obj_align(heart_img, LV_ALIGN_TOP_RIGHT, -17, 4); // Initial position
     }
-
     // Update the image source based on the `wimg` flag
     if (wimg) {
         lv_img_set_src(heart_img, &rb25mm); // Red-black image
@@ -113,28 +127,11 @@ bool is_moving_average_enabled() {
 void setup_ui(void) {
     // Set screen background color
     lv_obj_set_style_bg_color(lv_scr_act(), COLOR_BACKGND, 0);
-    // Title Label
-//    lv_obj_t *label_t = lv_label_create(lv_scr_act());
-//    lv_label_set_text(label_t, "HEALTH MONITOR");
-//    lv_obj_set_style_text_font(label_t, &lv_font_montserrat_22, 0);
-//    lv_obj_set_style_text_color(label_t, COLOR_FONT, 0);
-//    lv_obj_align(label_t, LV_ALIGN_TOP_LEFT, 10, 8); // Adjust alignment for heart image
-//
-
-//    // Image heart red
-//    lv_obj_t *heart_red_img = lv_img_create(lv_scr_act());
-//    lv_img_set_src(heart_red_img, &rb1cm);
-//    lv_obj_align(heart_red_img, LV_ALIGN_TOP_RIGHT, -17, 4); // Position to the
 
     // Image heart black
     lv_obj_t *heart_blk_img = lv_img_create(lv_scr_act());
     lv_img_set_src(heart_blk_img, &b25mm);
     lv_obj_align(heart_blk_img, LV_ALIGN_TOP_RIGHT, -17, 4); // Position to the
-
-//    // Image heart black red
-//    lv_obj_t *heart_blk_img = lv_img_create(lv_scr_act());
-//    lv_img_set_src(heart_blk_img, &rb25mm);
-//    lv_obj_align(heart_blk_img, LV_ALIGN_TOP_RIGHT, -17, 4); // Position to the
 
     // Image title
     lv_obj_t *title_img = lv_img_create(lv_scr_act());
@@ -305,17 +302,9 @@ void setup_ui(void) {
 	lv_obj_align(label_temp_unit, LV_ALIGN_BOTTOM_RIGHT, 10, 9); // Align near the top
 	// TEMP Changing Text
 	labelTE = lv_label_create(container_te);
-	lv_label_set_text(labelTE, "20");
+	lv_label_set_text(labelTE, "--");
 	lv_obj_set_style_text_font(labelTE, &lv_font_montserrat_28, 0); // Larger font for dynamic data
 	lv_obj_set_style_text_color(labelTE, COLOR_FONT, 0); // Black text
 	lv_obj_align(labelTE, LV_ALIGN_CENTER, 0, 2); // Align near the bottom
-
-
-
 }
-
-
-
-
-
 #endif

@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include "chart.h"
 #include "filter.h"
+#include "start.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -102,7 +103,7 @@ int main(void)
   tft_init();
   lv_disp_set_rotation(lv_disp_get_default(), LV_DISP_ROT_270);
   touchpad_init();
-
+  lv_example_anim_img();
   setup_ui();
   /* USER CODE END SysInit */
 
@@ -133,6 +134,9 @@ int main(void)
   float bufferPeakDet_ir[DATA_LENGTH] = {0};
   float bufferPeakDet_red[DATA_LENGTH] = {0};
   float SpO2 = 0, ratio = 0;
+  uint32_t buffHR = 0;
+  const float alpha = 0.8; // Smoothing factor (0 < alpha <= 1)
+
 
   /* USER CODE END 2 */
 
@@ -181,15 +185,21 @@ int main(void)
 
 						  if(isFingerDetected(bufferPeakDet_ir, DATA_LENGTH)){
 							  update_heartimg(1);
+							  update_temp(pulseOximeter_readTemperature());
 							  findPeaks(bufferPeakDet_ir, DATA_LENGTH, R, &R_count);
 							  calculateSpO2(bufferPeakDet_red, bufferPeakDet_ir, DATA_LENGTH, &SpO2, &ratio);
 							  SpO2 = (SpO2 > 100.0) ? 100.0 : (SpO2 < 0.0 ? 0.0 : SpO2);
 							  update_SPO2((uint32_t)SpO2);
-							  update_HR(heartRate(R, R_count));
+							  // Calculate the heart rate and update using the mean of the current and previous values
+							  buffHR = (buffHR == 0)
+							              ? heartRate(R, R_count)  // Initialize with the first reading
+							              : alpha * heartRate(R, R_count) + (1 - alpha) * buffHR; // EMA formula
+							  update_HR(buffHR);
 						  }else{
 							  update_heartimg(0);
-							  update_SPO2((uint32_t)0);
-							  update_HR(0);
+							  update_SPO2(NULL);
+							  update_HR(NULL);
+							  update_temp(NULL);
 						  }
 						  filled2 = 0;
 						  j = 0;
