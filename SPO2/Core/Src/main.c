@@ -54,11 +54,13 @@ I2C_HandleTypeDef hi2c2;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t pulseOximiterIntFlag = 0;
+
 #define FILTER_LENGTH 5       // Length of the high-pass filter buffer
 #define MOVING_AVG_LENGTH 2    // Length of the moving average buffer
 #define ALPHA 0.95f // High-pass filter coefficient
 #define M 12 // Size of the buffer
 #define DATA_LENGTH  1000  // Length of dataBuffer
+extern uint8_t startFinish;
 
 /* USER CODE END PV */
 
@@ -69,6 +71,9 @@ static void MX_I2C2_Init(void);
 /* USER CODE BEGIN PFP */
 float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha);
 float mean(const float *buffer, uint16_t size);
+
+
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -103,8 +108,8 @@ int main(void)
   tft_init();
   lv_disp_set_rotation(lv_disp_get_default(), LV_DISP_ROT_270);
   touchpad_init();
-  lv_example_anim_img();
-  setup_ui();
+//  setup_ui();
+  create_splash_screen();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -136,6 +141,7 @@ int main(void)
   float SpO2 = 0, ratio = 0;
   uint32_t buffHR = 0;
   const float alpha = 0.8; // Smoothing factor (0 < alpha <= 1)
+  uint32_t s = 0;
 
 
   /* USER CODE END 2 */
@@ -147,7 +153,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if (PUSLE_OXIMETER_INTERRUPT == 1) {
+
+
+	  if (PUSLE_OXIMETER_INTERRUPT == 1 && startFinish) {
 		  if (pulseOximiterIntFlag) {
 			  pulseOximiterIntFlag = 0;
 			  fifoLedData = pulseOximeter_readFifo();
@@ -228,8 +236,9 @@ int main(void)
 		  }
 	  }
 
-	  HAL_Delay(1);
 	  lv_timer_handler();
+	  HAL_Delay(1);
+
   }
 
   /* USER CODE END 3 */
@@ -426,6 +435,8 @@ void highPassFilterWithBuffer(float input, float *inputBuffer, float *outputBuff
     // Advance the circular buffer index
     index = (index + 1) % FILTER_LENGTH;
 }
+
+
 /* USER CODE END 4 */
 
 /**

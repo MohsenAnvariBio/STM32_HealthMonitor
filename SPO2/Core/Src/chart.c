@@ -5,18 +5,17 @@
  *      Author: Mohsen PC
  */
 
+#include <image.h>
 #include"lvgl/lvgl.h"
-#include "lvgl/examples/lv_examples.h"
+//#include "lvgl/examples/lv_examples.h"
 #include"chart.h"
 //#include"heart_blk.c"
-#include "heart_blk.h"
 #include "system.h"
 #include "string.h"
 #include <stdio.h>
 
 
 #if LV_USE_SPINBOX && LV_BUILD_EXAMPLES
-
 static lv_obj_t *spinbox; // Declare the spinbox globally to use its value elsewhere
 static lv_obj_t *chart;   // Chart object
 static lv_chart_series_t *ser2; // Chart series
@@ -26,11 +25,6 @@ lv_obj_t *labelspo2;
 lv_obj_t *labelHR;
 lv_obj_t *labelTE;
 
-
-
-
-#define COLOR_BACKGND lv_color_make(131, 165, 133)
-#define COLOR_FONT lv_color_make(0x00, 0x0, 0x00)
 LV_FONT_DECLARE(lv_font_montserrat_20); // Modern medium-sized font for labels
 
 // Increment event callback
@@ -123,6 +117,7 @@ void switch_event_handler(lv_event_t *e) {
 bool is_moving_average_enabled() {
     return use_moving_average;
 }
+
 
 void setup_ui(void) {
     // Set screen background color
@@ -307,4 +302,5 @@ void setup_ui(void) {
 	lv_obj_set_style_text_color(labelTE, COLOR_FONT, 0); // Black text
 	lv_obj_align(labelTE, LV_ALIGN_CENTER, 0, 2); // Align near the bottom
 }
+
 #endif

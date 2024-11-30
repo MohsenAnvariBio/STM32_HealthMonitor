@@ -23,8 +23,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "../../lvgl/lvgl.h"
-#include "max30102_for_stm32_hal.h"
-extern max30102_t max30102;
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
