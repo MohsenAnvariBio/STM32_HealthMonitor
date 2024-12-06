@@ -1,5 +1,5 @@
 /*
- * spinbox.c
+ * ui.c
  *
  *  Created on: Nov 20, 2024
  *      Author: Mohsen PC
@@ -7,24 +7,24 @@
 
 #include <image.h>
 #include"lvgl/lvgl.h"
-//#include "lvgl/examples/lv_examples.h"
-#include"chart.h"
-//#include"heart_blk.c"
 #include "system.h"
 #include "string.h"
 #include <stdio.h>
+#include "ui.h"
 
 
 #if LV_USE_SPINBOX && LV_BUILD_EXAMPLES
-static lv_obj_t *spinbox; // Declare the spinbox globally to use its value elsewhere
-static lv_obj_t *chart;   // Chart object
-static lv_chart_series_t *ser2; // Chart series
-lv_obj_t * label_t;
+
+static lv_obj_t *spinbox;
+static lv_obj_t *chart;
+static lv_chart_series_t *ser2;
+
+
+lv_obj_t *label_t;
 bool use_moving_average = false;
 lv_obj_t *labelspo2;
 lv_obj_t *labelHR;
 lv_obj_t *labelTE;
-
 LV_FONT_DECLARE(lv_font_montserrat_20); // Modern medium-sized font for labels
 
 // Increment event callback
@@ -44,7 +44,6 @@ static void lv_spinbox_increment_event_cb(lv_event_t *e) {
 }
 
 
-
 // Function to update the chart dynamically
 void update_chart_with_gain(float output) {
     // Get the value from the spinbox
@@ -55,7 +54,7 @@ void update_chart_with_gain(float output) {
 }
 
 void update_SPO2(uint32_t spo2) {
-	if (spo2 == NULL){
+	if (spo2 == SPO2_INVALID){
 		lv_label_set_text(labelspo2, "--");
 	}else{
 		char buffer[20];  // Ensure the buffer is large enough to hold the text
@@ -65,22 +64,22 @@ void update_SPO2(uint32_t spo2) {
 }
 
 void update_HR(uint32_t hr) {
-	if (hr == NULL){
+	if (hr == SPO2_INVALID){
 		lv_label_set_text(labelHR, "--");
 	}else{
-	    char buffer[20];  // Ensure the buffer is large enough to hold the text
-	    snprintf(buffer, sizeof(buffer), "%d", hr);  // Convert the value to a string
-	    lv_label_set_text(labelHR, buffer);  // Update the label text with the formatted string
+	    char buffer[20];
+	    snprintf(buffer, sizeof(buffer), "%d", hr);
+	    lv_label_set_text(labelHR, buffer);
 	}
 }
 
 void update_temp(uint32_t t) {
-	if (t == NULL){
+	if (t == SPO2_INVALID){
 		lv_label_set_text(labelTE, "--");
 	}else{
-	    char buffer[20];  // Ensure the buffer is large enough to hold the text
-	    snprintf(buffer, sizeof(buffer), "%d", t);  // Convert the value to a string
-	    lv_label_set_text(labelTE, buffer);  // Update the label text with the formatted string
+	    char buffer[20];
+	    snprintf(buffer, sizeof(buffer), "%d", t);
+	    lv_label_set_text(labelTE, buffer);
 	}
 }
 

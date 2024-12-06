@@ -20,12 +20,13 @@
 
 
 float process_ppg_signal(float ppg_signal_rdc, float *buffer, int M, int *i, int *filled);
-float calculateMean(float *array, int length);
+float mean(float *array, int length);
 void findPeaks(float *dataBuffer, int length, uint32_t *R, uint32_t *R_count);
 uint16_t heartRate(uint32_t *R, int R_count);
-float calculateMedian(float *array, int count);
+float median(float *array, int count);
 uint16_t isFingerDetected(float *dataBuffer, size_t bufferSize);
 float process_ppg_signal(float ppg_signal_rdc, float *buffer, int M, int *i, int *filled);
+float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha);
 
 
 #endif /* __FILTER_H__ */

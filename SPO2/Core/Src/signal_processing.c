@@ -1,47 +1,18 @@
 /*
- * filter.c
+ * spinbox.c
  *
- *  Created on: Jan 29, 2022
- *      Author: Mario Regus
- *
- *  Note: Contains code adapted from Raivis Strogonivs
- *  https://morf.lv/implementing-pulse-oximeter-using-max30100
- *  https://github.com/xcoder123/MAX30100
+ *  Created on: Nov 20, 2024
+ *      Author: Mohsen PC
  */
 
-#include "filter.h"
 #include <stdio.h>
 #include <math.h>
-
-
-// Main processing function
-float process_ppg_signal(float ppg_signal_rdc, float *buffer, int M, int *i, int *filled) {
-    float output = 0.0;
-
-    if (*i < M) {
-        // Fill the buffer until it is full
-        buffer[*i] = ppg_signal_rdc;
-//        (*i)++;
-        if (*i == M) {
-            *filled = 1; // Mark buffer as full
-        }
-    } else if (*filled) {
-        // Compute the mean of the buffer
-        output = calculate_mean(buffer, M);
-
-        // Shift buffer elements to make space for the new data
-        for (int j = 0; j < M - 1; j++) {
-            buffer[j] = buffer[j + 1];
-        }
-        buffer[M - 1] = ppg_signal_rdc;
-    }
-
-    return output; // Return the calculated mean (0.0 if the buffer is not yet full)
-}
+#include <signal_processing.h>
+#include <stdlib.h>
 
 
 // Helper function to calculate mean of an array
-float calculateMean(float *array, int length) {
+float mean(float *array, int length) {
 	float sum = 0;
 	for (int i = 0; i < length; i++) {
 		sum += array[i];
@@ -49,7 +20,7 @@ float calculateMean(float *array, int length) {
 	return sum / length;
 }
 // Function to calculate the median
-float calculateMedian(float *array, int count) {
+float median(float *array, int count) {
     // Sort the array
     for (int i = 0; i < count - 1; i++) {
         for (int j = i + 1; j < count; j++) {
@@ -72,13 +43,45 @@ float calculateMedian(float *array, int count) {
     }
 }
 
+// High-pass filter function
+float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha) {
+    float inputF = input; // No need to cast, input is already float
+    float output = alpha * (*prevOutput + inputF - *prevInput);
+    *prevInput = inputF;
+    *prevOutput = output;
+    return output;
+}
 
+// Main processing function
+float process_ppg_signal(float ppg_signal_rdc, float *buffer, int M, int *i, int *filled) {
+    float output = 0.0;
+
+    if (*i < M) {
+        // Fill the buffer until it is full
+        buffer[*i] = ppg_signal_rdc;
+//        (*i)++;
+        if (*i == M) {
+            *filled = 1; // Mark buffer as full
+        }
+    } else if (*filled) {
+        // Compute the mean of the buffer
+        output = mean(buffer, M);
+
+        // Shift buffer elements to make space for the new data
+        for (int j = 0; j < M - 1; j++) {
+            buffer[j] = buffer[j + 1];
+        }
+        buffer[M - 1] = ppg_signal_rdc;
+    }
+
+    return output; // Return the calculated mean (0.0 if the buffer is not yet full)
+}
 
 
 // Main function to find peaks
 void findPeaks(float *dataBuffer, int length, uint32_t *R, uint32_t *R_count) {
 	int Nd = 3;
-	int N = 4;
+//	int N = 4;
 	int RRmin = (int)(30); // Minimum refractory period
 	int QRSint = (int)(40); // Window for QRS complex
 	int pth = (int)(1); // Exponential decay factor
@@ -87,11 +90,11 @@ void findPeaks(float *dataBuffer, int length, uint32_t *R, uint32_t *R_count) {
 	uint32_t preData[length];
 	uint32_t dif_d[length - Nd];
 	float max_val[length];
-	float thPlot[length];
+//	float thPlot[length];
 	int max_pos[length];
 
 	for (int i = 0; i < length; i++) {
-		if (dataBuffer[i]<calculateMean(dataBuffer,length)) {
+		if (dataBuffer[i]<mean(dataBuffer,length)) {
 			preData[i] = 0;
 		} else {
 			preData[i] = dataBuffer[i];
@@ -107,7 +110,7 @@ void findPeaks(float *dataBuffer, int length, uint32_t *R, uint32_t *R_count) {
 
 	// Dynamic threshold and peak detection
 	float th = 10; // Initial threshold
-	int n = 0, s = 1, i = 0;
+	int n = 0, i = 0;
 	*R_count = 0; // Initialize R-peak count
 
 	while (n < length - Nd) {
@@ -132,7 +135,7 @@ void findPeaks(float *dataBuffer, int length, uint32_t *R, uint32_t *R_count) {
 			// Update indices and threshold
 			int d = RRmin + QRSint - local_max_pos;
 			n += RRmin + QRSint + RRmin - d;
-			th = calculateMean(max_val, i + 1);
+			th = mean(max_val, i + 1);
 //			for(int i=s; i<s+n; i++) {
 //				thPlot[i] = th;
 //			}
@@ -169,8 +172,8 @@ uint16_t heartRate(uint32_t *R, int R_count) {
     }
 
     // Calculate median of RR intervals
-    float medianRR = calculateMedian(dR, R_count - 1);
-    free(dR); // Free allocated memory
+    float medianRR = median(dR, R_count - 1);
+//    free(dR); // Free allocated memory
 
     // Check for division by zero
     if (medianRR == 0) {
@@ -189,7 +192,7 @@ uint16_t isFingerDetected(float *dataBuffer, size_t bufferSize) {
     }
 
     // Calculate the mean of the data buffer
-    float meanValue = calculateMean(dataBuffer, bufferSize);
+    float meanValue = mean(dataBuffer, bufferSize);
 
     // Check if the mean value falls within the defined thresholds
     if ((meanValue > FINGER_THRESHOLD_LOW && meanValue < FINGER_THRESHOLD_HIGH) ||
@@ -210,7 +213,7 @@ uint16_t isFingerDetected(float *dataBuffer, size_t bufferSize) {
  * @param SpO2 Pointer to store the calculated SpO2 value
  * @param ratio Pointer to store the calculated ratio (optional)
  */
-void calculateSpO2(float *redSignal, float *irSignal, int length, float *SpO2, float *ratio) {
+void calculate_SpO2(float *redSignal, float *irSignal, int length, float *SpO2, float *ratio) {
     float acRed = 0, acIr = 0;
 
     // Calculate the RMS of the signals (AC component)

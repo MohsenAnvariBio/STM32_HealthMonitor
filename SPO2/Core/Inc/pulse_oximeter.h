@@ -190,10 +190,10 @@ FIFO_LED_DATA pulseOximeter_readFifo(void);
 float pulseOximeter_readTemperature(void);
 void pulseOximeter_initFifo(void);
 void pulseOximeter_clearInterrupt(void);
-MAX30102 pulseOximeter_update(FIFO_LED_DATA m_fifoData);
-bool detectPulse(float sensor_value);
+//MAX30102 pulseOximeter_update(FIFO_LED_DATA m_fifoData);
+//bool detectPulse(float sensor_value);
 void balanceIntesities( float redLedDC, float IRLedDC );
-void pulseOximeter_displayData(void);
-uint32_t pulseOximeter_getSpo2(void);
+//void pulseOximeter_displayData(void);
+//uint32_t pulseOximeter_getSpo2(void);
 
 #endif /* __PULSE_OXIMETER_H__ */

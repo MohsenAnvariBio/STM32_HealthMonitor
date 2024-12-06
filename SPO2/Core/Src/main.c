@@ -21,17 +21,17 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "system.h"
+#include <string.h>
+#include <stdio.h>
 #include "../../lvgl/lvgl.h"
 #include "../../lv_conf.h"
 #include "tft.h"
 #include "touchpad.h"
 #include "pulse_oximeter.h"
-#include "system.h"
-#include "string.h"
-#include <stdio.h>
-#include "chart.h"
-#include "filter.h"
+#include "ui.h"
 #include "start.h"
+#include "signal_processing.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,7 +41,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define MOVING_AVG_L 12       // Size of the moving average buffer
+#define DATA_LENGTH  1000     // Length of data buffer
+#define SPO2_INVALID 0xFFFFFFFF // Sentinel value for invalid SpO2 data
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,14 +56,19 @@ I2C_HandleTypeDef hi2c2;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t pulseOximiterIntFlag = 0;
-
-#define FILTER_LENGTH 5       // Length of the high-pass filter buffer
-#define MOVING_AVG_LENGTH 2    // Length of the moving average buffer
-#define ALPHA 0.95f // High-pass filter coefficient
-#define M 12 // Size of the buffer
-#define DATA_LENGTH  1000  // Length of dataBuffer
 extern uint8_t startFinish;
-
+float prevInput_ir = 0.0f, prevOutput_ir = 0.0f;
+float prevInput_red = 0.0f, prevOutput_red = 0.0f;
+float buffer_ir[MOVING_AVG_L] = {0};
+float buffer_red[MOVING_AVG_L] = {0};
+float bufferPeakDet_ir[DATA_LENGTH] = {0};
+float bufferPeakDet_red[DATA_LENGTH] = {0};
+uint32_t R[DATA_LENGTH] = {0};
+float SpO2 = 0, ratio = 0;
+uint32_t buffHR = 0;
+int i = 0, j = 0, filled = 0, filled2 = 0;
+uint32_t R_count = 0;
+const float alpha = 0.8f; // Smoothing factor (0 < alpha <= 1)
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,11 +76,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C2_Init(void);
 /* USER CODE BEGIN PFP */
-float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha);
-float mean(const float *buffer, uint16_t size);
-
-
-
+//float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha);
+//float mean(const float *buffer, uint16_t size);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -96,10 +100,6 @@ int main(void)
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
-  /* USER CODE BEGIN Init */
-
-//  /* USER CODE END Init */
-
   /* Configure the system clock */
   SystemClock_Config();
 
@@ -108,7 +108,6 @@ int main(void)
   tft_init();
   lv_disp_set_rotation(lv_disp_get_default(), LV_DISP_ROT_270);
   touchpad_init();
-//  setup_ui();
   create_splash_screen();
   /* USER CODE END SysInit */
 
@@ -116,7 +115,6 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
-
   FIFO_LED_DATA fifoLedData;
   pulseOximeter_resetRegisters();
   pulseOximeter_initFifo();
@@ -126,24 +124,6 @@ int main(void)
   pulseOximeter_setLedCurrent(IR_LED, 5);
   pulseOximeter_resetFifo();
   pulseOximeter_setMeasurementMode(SPO2);
-
-  // High-pass filter state variables
-  float prevInput_ir = 0.0f, prevOutput_ir = 0.0f;
-  float prevInput_red = 0.0f, prevOutput_red = 0.0f;
-  float buffer_ir[M] = {0};
-  float buffer_red[M] = {0};
-  int i = 0, j = 0;
-  int filled = 0, filled2 = 0;
-  uint32_t R[DATA_LENGTH] = {0};
-  uint32_t R_count = 0;
-  float bufferPeakDet_ir[DATA_LENGTH] = {0};
-  float bufferPeakDet_red[DATA_LENGTH] = {0};
-  float SpO2 = 0, ratio = 0;
-  uint32_t buffHR = 0;
-  const float alpha = 0.8; // Smoothing factor (0 < alpha <= 1)
-  uint32_t s = 0;
-
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -153,94 +133,81 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    if (PUSLE_OXIMETER_INTERRUPT && startFinish) {
+      if (pulseOximiterIntFlag) {
+        pulseOximiterIntFlag = 0;
+        fifoLedData = pulseOximeter_readFifo();
 
+        float ppg_signal_ir = (float)fifoLedData.irLedRaw;
+        float ppg_signal_red = (float)fifoLedData.redLedRaw;
 
-	  if (PUSLE_OXIMETER_INTERRUPT == 1 && startFinish) {
-		  if (pulseOximiterIntFlag) {
-			  pulseOximiterIntFlag = 0;
-			  fifoLedData = pulseOximeter_readFifo();
-			  float ppg_signalir = (float)fifoLedData.irLedRaw;
-			  float ppg_signalred = (float)fifoLedData.redLedRaw;
+        float ppg_signal_ir_dc = highPassFilter(ppg_signal_ir, &prevInput_ir, &prevOutput_ir, 0.95f);
+        float ppg_signal_red_dc = highPassFilter(ppg_signal_red, &prevInput_red, &prevOutput_red, 0.95f);
 
-			  // High-pass filter
-			  float ppg_signal_ir_dc = highPassFilter(ppg_signalir, &prevInput_ir, &prevOutput_ir, 0.95f);
-			  float ppg_signal_red_dc = highPassFilter(ppg_signalred, &prevInput_red, &prevOutput_red, 0.95f);
+        if (is_moving_average_enabled()) {
+          if (i < MOVING_AVG_L) {
+            buffer_ir[i] = ppg_signal_ir_dc;
+            buffer_red[i] = ppg_signal_red_dc;
+            i++;
+            if (i == MOVING_AVG_L) filled = 1;
+          } else if (filled) {
+            float ma_ir = mean(buffer_ir, MOVING_AVG_L);
+            float ma_red = mean(buffer_red, MOVING_AVG_L);
+            update_chart_with_gain(ma_ir);
 
-			  if (is_moving_average_enabled()) {
-				  // Moving average enabled
-				  if (i < M) {
-					  buffer_ir[i] = ppg_signal_ir_dc;
-					  buffer_red[i] = ppg_signal_red_dc;
-					  i++;
-					  if (i == M) {
-						  filled = 1;
-					  }
-				  } else if (filled) {
-					  float ma_ir = mean(buffer_ir, M);
-					  float ma_red = mean(buffer_red, M);
-					  update_chart_with_gain(ma_ir);
+            if (j < DATA_LENGTH) {
+              bufferPeakDet_ir[j] = -ma_ir / 40;
+              bufferPeakDet_red[j] = -ma_red / 40;
+              j++;
+              if (j == DATA_LENGTH) filled2 = 1;
+            } else if (filled2) {
+              if (isFingerDetected(bufferPeakDet_ir, DATA_LENGTH)) {
+                update_heartimg(1);
+                update_temp(pulseOximeter_readTemperature());
+                findPeaks(bufferPeakDet_ir, DATA_LENGTH, R, &R_count);
+                calculate_SpO2(bufferPeakDet_red, bufferPeakDet_ir, DATA_LENGTH, &SpO2, &ratio);
+                SpO2 = (SpO2 > 100.0f) ? 100.0f : (SpO2 < 0.0f ? 0.0f : SpO2);
+                update_SPO2((uint32_t)SpO2);
 
-					  if (j < DATA_LENGTH) {
-						  bufferPeakDet_ir[j] = -ma_ir/40;
-						  bufferPeakDet_red[j] = -ma_red/40;
-					  	  j++;
-					  	  if (j == DATA_LENGTH) {
-					  		  filled2 = 1;
-					  	  }
-					  } else if (filled2){
-						  //If the following problems happen during compiling by STM32CubeIDE, go to "Project > Properties > C/C++ Build > Settings > Tool Settings > MCU Settings" and then check the box "Use float with printf from newlib-nano (-u _printf_float)."
-//						  printf('%.2f', bufferPeakDet_ir);
+                buffHR = (buffHR == 0)
+                           ? heartRate(R, R_count)
+                           : alpha * heartRate(R, R_count) + (1.0f - alpha) * buffHR;
+                update_HR(buffHR);
+              } else {
+                update_heartimg(0);
+                update_SPO2(SPO2_INVALID);
+                update_HR(SPO2_INVALID);
+                update_temp(SPO2_INVALID);
+              }
 
-						  if(isFingerDetected(bufferPeakDet_ir, DATA_LENGTH)){
-							  update_heartimg(1);
-							  update_temp(pulseOximeter_readTemperature());
-							  findPeaks(bufferPeakDet_ir, DATA_LENGTH, R, &R_count);
-							  calculateSpO2(bufferPeakDet_red, bufferPeakDet_ir, DATA_LENGTH, &SpO2, &ratio);
-							  SpO2 = (SpO2 > 100.0) ? 100.0 : (SpO2 < 0.0 ? 0.0 : SpO2);
-							  update_SPO2((uint32_t)SpO2);
-							  // Calculate the heart rate and update using the mean of the current and previous values
-							  buffHR = (buffHR == 0)
-							              ? heartRate(R, R_count)  // Initialize with the first reading
-							              : alpha * heartRate(R, R_count) + (1 - alpha) * buffHR; // EMA formula
-							  update_HR(buffHR);
-						  }else{
-							  update_heartimg(0);
-							  update_SPO2(NULL);
-							  update_HR(NULL);
-							  update_temp(NULL);
-						  }
-						  filled2 = 0;
-						  j = 0;
-						  R_count= 0;
-						  SpO2 = 0;
+              filled2 = 0;
+              j = 0;
+              R_count = 0;
+              SpO2 = 0.0f;
 
-						  memset(bufferPeakDet_ir, 0, sizeof(bufferPeakDet_ir));
-						  memset(bufferPeakDet_red, 0, sizeof(bufferPeakDet_red));
-						  memset(R, 0, sizeof(R));
-					  }
+              memset(bufferPeakDet_ir, 0, sizeof(bufferPeakDet_ir));
+              memset(bufferPeakDet_red, 0, sizeof(bufferPeakDet_red));
+              memset(R, 0, sizeof(R));
+            }
 
-					  // Shift buffer elements
-					  for (int j = 0; j < M - 1; j++) {
-						  buffer_ir[j] = buffer_ir[j + 1];
-						  buffer_red[j] = buffer_red[j + 1];
-					  }
-					  buffer_ir[M - 1] = ppg_signal_ir_dc;
-					  buffer_red[M - 1] = ppg_signal_red_dc;
-				  }
-			  } else {
-				  // Only high-pass filter
-				  update_chart_with_gain(ppg_signal_ir_dc);
-			  }
+            for (int k = 0; k < MOVING_AVG_L - 1; k++) {
+              buffer_ir[k] = buffer_ir[k + 1];
+              buffer_red[k] = buffer_red[k + 1];
+            }
+            buffer_ir[MOVING_AVG_L - 1] = ppg_signal_ir_dc;
+            buffer_red[MOVING_AVG_L - 1] = ppg_signal_red_dc;
+          }
+        } else {
+          update_chart_with_gain(ppg_signal_ir_dc);
+        }
 
-			  pulseOximeter_clearInterrupt();
-		  }
-	  }
+        pulseOximeter_clearInterrupt();
+      }
+    }
 
-	  lv_timer_handler();
-	  HAL_Delay(1);
-
+    lv_timer_handler();
+    HAL_Delay(1);
   }
-
   /* USER CODE END 3 */
 }
 
@@ -392,48 +359,13 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 /* USER CODE BEGIN 4 */
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == GPIO_PIN_9)
 	{
 		pulseOximiterIntFlag = 1;
 	}
-}
-
-// High-pass filter function
-float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha) {
-    float inputF = input; // No need to cast, input is already float
-    float output = alpha * (*prevOutput + inputF - *prevInput);
-    *prevInput = inputF;
-    *prevOutput = output;
-    return output;
-}
-
-// Function to calculate the mean of an array
-float mean(const float *buffer, uint16_t size) {
-    float sum = 0.0f;
-    for (int i = 0; i < size; i++) {
-        sum += buffer[i];
-    }
-    return sum / size;
-}
-
-
-void highPassFilterWithBuffer(float input, float *inputBuffer, float *outputBuffer, float *filteredSample, float alpha) {
-    static int index = 0; // Circular buffer index
-
-    // Add new input to the buffer (circular behavior)
-    inputBuffer[index] = input;
-
-    // Compute the high-pass filter output
-    int prevIndex = (index - 1 + FILTER_LENGTH) % FILTER_LENGTH; // Previous index in circular buffer
-    outputBuffer[index] = alpha * (outputBuffer[prevIndex] + inputBuffer[index] - inputBuffer[prevIndex]);
-
-    // Save the current filtered sample for visualization
-    *filteredSample = outputBuffer[index];
-
-    // Advance the circular buffer index
-    index = (index + 1) % FILTER_LENGTH;
 }
 
 

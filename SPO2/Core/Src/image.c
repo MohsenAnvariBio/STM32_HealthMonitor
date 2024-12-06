@@ -1,8 +1,8 @@
 /*
- * heart_red.c
+ * image.c
  *
  *  Created on: Nov 28, 2024
- *      Author: demom
+ *      Author: Mohsen
  */
 #include <image.h>
 #include <stdint.h>
