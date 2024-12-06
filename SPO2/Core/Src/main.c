@@ -76,8 +76,12 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C2_Init(void);
 /* USER CODE BEGIN PFP */
-//float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha);
-//float mean(const float *buffer, uint16_t size);
+static void processPulseOximeterData(void);
+static void handleHighPassFilter(float irRaw, float redRaw);
+static void processMovingAverage(float irSignal, float redSignal);
+static void handlePeakDetection(void);
+static void resetBuffers(void);
+static void shiftBuffers(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -133,77 +137,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    if (PUSLE_OXIMETER_INTERRUPT && startFinish) {
-      if (pulseOximiterIntFlag) {
-        pulseOximiterIntFlag = 0;
-        fifoLedData = pulseOximeter_readFifo();
-
-        float ppg_signal_ir = (float)fifoLedData.irLedRaw;
-        float ppg_signal_red = (float)fifoLedData.redLedRaw;
-
-        float ppg_signal_ir_dc = highPassFilter(ppg_signal_ir, &prevInput_ir, &prevOutput_ir, 0.95f);
-        float ppg_signal_red_dc = highPassFilter(ppg_signal_red, &prevInput_red, &prevOutput_red, 0.95f);
-
-        if (is_moving_average_enabled()) {
-          if (i < MOVING_AVG_L) {
-            buffer_ir[i] = ppg_signal_ir_dc;
-            buffer_red[i] = ppg_signal_red_dc;
-            i++;
-            if (i == MOVING_AVG_L) filled = 1;
-          } else if (filled) {
-            float ma_ir = mean(buffer_ir, MOVING_AVG_L);
-            float ma_red = mean(buffer_red, MOVING_AVG_L);
-            update_chart_with_gain(ma_ir);
-
-            if (j < DATA_LENGTH) {
-              bufferPeakDet_ir[j] = -ma_ir / 40;
-              bufferPeakDet_red[j] = -ma_red / 40;
-              j++;
-              if (j == DATA_LENGTH) filled2 = 1;
-            } else if (filled2) {
-              if (isFingerDetected(bufferPeakDet_ir, DATA_LENGTH)) {
-                update_heartimg(1);
-                update_temp(pulseOximeter_readTemperature());
-                findPeaks(bufferPeakDet_ir, DATA_LENGTH, R, &R_count);
-                calculate_SpO2(bufferPeakDet_red, bufferPeakDet_ir, DATA_LENGTH, &SpO2, &ratio);
-                SpO2 = (SpO2 > 100.0f) ? 100.0f : (SpO2 < 0.0f ? 0.0f : SpO2);
-                update_SPO2((uint32_t)SpO2);
-
-                buffHR = (buffHR == 0)
-                           ? heartRate(R, R_count)
-                           : alpha * heartRate(R, R_count) + (1.0f - alpha) * buffHR;
-                update_HR(buffHR);
-              } else {
-                update_heartimg(0);
-                update_SPO2(SPO2_INVALID);
-                update_HR(SPO2_INVALID);
-                update_temp(SPO2_INVALID);
-              }
-
-              filled2 = 0;
-              j = 0;
-              R_count = 0;
-              SpO2 = 0.0f;
-
-              memset(bufferPeakDet_ir, 0, sizeof(bufferPeakDet_ir));
-              memset(bufferPeakDet_red, 0, sizeof(bufferPeakDet_red));
-              memset(R, 0, sizeof(R));
-            }
-
-            for (int k = 0; k < MOVING_AVG_L - 1; k++) {
-              buffer_ir[k] = buffer_ir[k + 1];
-              buffer_red[k] = buffer_red[k + 1];
-            }
-            buffer_ir[MOVING_AVG_L - 1] = ppg_signal_ir_dc;
-            buffer_red[MOVING_AVG_L - 1] = ppg_signal_red_dc;
-          }
-        } else {
-          update_chart_with_gain(ppg_signal_ir_dc);
-        }
-
-        pulseOximeter_clearInterrupt();
-      }
-    }
+	if (PUSLE_OXIMETER_INTERRUPT && startFinish)
+	{
+		if (pulseOximiterIntFlag)
+		{
+			pulseOximiterIntFlag = 0;
+			processPulseOximeterData();
+		}
+	}
 
     lv_timer_handler();
     HAL_Delay(1);
@@ -368,6 +309,146 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 }
 
+
+/* Function definitions */
+
+/**
+ * @brief Process pulse oximeter data by reading FIFO and applying filtering.
+ */
+static void processPulseOximeterData(void)
+{
+    FIFO_LED_DATA fifoLedData = pulseOximeter_readFifo();
+
+    float irRaw = (float)fifoLedData.irLedRaw;
+    float redRaw = (float)fifoLedData.redLedRaw;
+
+    handleHighPassFilter(irRaw, redRaw);
+}
+
+/**
+ * @brief Apply high-pass filtering on raw signals and proceed with further processing.
+ * @param irRaw Raw IR signal.
+ * @param redRaw Raw red signal.
+ */
+static void handleHighPassFilter(float irRaw, float redRaw)
+{
+    float irFiltered = highPassFilter(irRaw, &prevInput_ir, &prevOutput_ir, 0.95f);
+    float redFiltered = highPassFilter(redRaw, &prevInput_red, &prevOutput_red, 0.95f);
+
+    if (is_moving_average_enabled())
+    {
+        processMovingAverage(irFiltered, redFiltered);
+    }
+    else
+    {
+        update_chart_with_gain(irFiltered);
+    }
+
+    pulseOximeter_clearInterrupt();
+}
+
+/**
+ * @brief Process signals with moving average and manage peak detection.
+ * @param irSignal Filtered IR signal.
+ * @param redSignal Filtered red signal.
+ */
+static void processMovingAverage(float irSignal, float redSignal)
+{
+    if (i < MOVING_AVG_L)
+    {
+        buffer_ir[i] = irSignal;
+        buffer_red[i] = redSignal;
+        i++;
+
+        if (i == MOVING_AVG_L)
+        {
+            filled = 1;
+        }
+    }
+    else if (filled)
+    {
+        float ma_ir = mean(buffer_ir, MOVING_AVG_L);
+        float ma_red = mean(buffer_red, MOVING_AVG_L);
+        update_chart_with_gain(ma_ir);
+
+        if (j < DATA_LENGTH)
+        {
+            bufferPeakDet_ir[j] = -ma_ir / 40;
+            bufferPeakDet_red[j] = -ma_red / 40;
+            j++;
+
+            if (j == DATA_LENGTH)
+            {
+                filled2 = 1;
+            }
+        }
+        else if (filled2)
+        {
+            handlePeakDetection();
+            resetBuffers();
+        }
+
+        shiftBuffers();
+        buffer_ir[MOVING_AVG_L - 1] = irSignal;
+        buffer_red[MOVING_AVG_L - 1] = redSignal;
+    }
+}
+
+/**
+ * @brief Handle peak detection and calculate SpO2 and heart rate.
+ */
+static void handlePeakDetection(void)
+{
+    if (isFingerDetected(bufferPeakDet_ir, DATA_LENGTH))
+    {
+        update_heartimg(1);
+        update_temp(pulseOximeter_readTemperature());
+
+        findPeaks(bufferPeakDet_ir, DATA_LENGTH, R, &R_count);
+        calculate_SpO2(bufferPeakDet_red, bufferPeakDet_ir, DATA_LENGTH, &SpO2, &ratio);
+        SpO2 = (SpO2 > 100.0f) ? 100.0f : (SpO2 < 0.0f ? 0.0f : SpO2);
+        update_SPO2((uint32_t)SpO2);
+
+        buffHR = (buffHR == 0)
+                     ? heartRate(R, R_count)
+                     : alpha * heartRate(R, R_count) + (1.0f - alpha) * buffHR;
+        update_HR(buffHR);
+    }
+    else
+    {
+        update_heartimg(0);
+        update_SPO2(SPO2_INVALID);
+        update_HR(SPO2_INVALID);
+        update_temp(SPO2_INVALID);
+    }
+}
+
+/**
+ * @brief Reset buffers and counters for the next cycle of data processing.
+ */
+static void resetBuffers(void)
+{
+    filled2 = 0;
+    j = 0;
+    R_count = 0;
+    SpO2 = 0.0f;
+
+    memset(bufferPeakDet_ir, 0, sizeof(bufferPeakDet_ir));
+    memset(bufferPeakDet_red, 0, sizeof(bufferPeakDet_red));
+    memset(R, 0, sizeof(R));
+}
+
+/**
+ * @brief Shift the elements of the moving average buffers to make room for new data.
+ */
+static void shiftBuffers(void)
+{
+    for (int k = 0; k < MOVING_AVG_L - 1; k++)
+    {
+        buffer_ir[k] = buffer_ir[k + 1];
+        buffer_red[k] = buffer_red[k + 1];
+    }
+}
 
 /* USER CODE END 4 */
 
