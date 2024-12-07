@@ -43,7 +43,7 @@
 /* USER CODE BEGIN PD */
 #define MOVING_AVG_L 12       // Size of the moving average buffer
 #define DATA_LENGTH  1000     // Length of data buffer
-#define SPO2_INVALID 0xFFFFFFFF // Sentinel value for invalid SpO2 data
+#define INVALID_VALUE 0xFFFFFFFF // Sentinel value for invalid SpO2 data
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -417,9 +417,9 @@ static void handlePeakDetection(void)
     else
     {
         update_heartimg(0);
-        update_SPO2(SPO2_INVALID);
-        update_HR(SPO2_INVALID);
-        update_temp(SPO2_INVALID);
+        update_SPO2(INVALID_VALUE);
+        update_HR(INVALID_VALUE);
+        update_temp(INVALID_VALUE);
     }
 }
 

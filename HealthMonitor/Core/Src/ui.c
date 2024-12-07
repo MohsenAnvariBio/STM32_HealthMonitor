@@ -54,7 +54,7 @@ void update_chart_with_gain(float output) {
 }
 
 void update_SPO2(uint32_t spo2) {
-	if (spo2 == SPO2_INVALID){
+	if (spo2 == INVALID_VALUE){
 		lv_label_set_text(labelspo2, "--");
 	}else{
 		char buffer[20];  // Ensure the buffer is large enough to hold the text
@@ -64,7 +64,7 @@ void update_SPO2(uint32_t spo2) {
 }
 
 void update_HR(uint32_t hr) {
-	if (hr == SPO2_INVALID){
+	if (hr == INVALID_VALUE){
 		lv_label_set_text(labelHR, "--");
 	}else{
 	    char buffer[20];
@@ -74,7 +74,7 @@ void update_HR(uint32_t hr) {
 }
 
 void update_temp(uint32_t t) {
-	if (t == SPO2_INVALID){
+	if (t == INVALID_VALUE){
 		lv_label_set_text(labelTE, "--");
 	}else{
 	    char buffer[20];

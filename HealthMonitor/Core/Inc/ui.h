@@ -14,7 +14,7 @@ extern "C" {
 
 	#define COLOR_BACKGND lv_color_make(131, 165, 133)
 	#define COLOR_FONT lv_color_make(0x00, 0x0, 0x00)
-	#define SPO2_INVALID 0xFFFFFFFF
+	#define INVALID_VALUE 0xFFFFFFFF
 
 	void update_chart_with_gain(float output);
 	void setup_ui(void);
