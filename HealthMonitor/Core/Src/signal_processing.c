@@ -1,5 +1,5 @@
 /*
- * spinbox.c
+ * signal_processing.c
  *
  *  Created on: Nov 20, 2024
  *      Author: Mohsen PC
