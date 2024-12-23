@@ -11,7 +11,13 @@
 #include <stdlib.h>
 
 
-// Helper function to calculate mean of an array
+/**
+ * Calculate the mean of an array.
+ *
+ * @param array Pointer to the array of floats
+ * @param length Number of elements in the array
+ * @return The calculated mean of the array
+ */
 float mean(float *array, int length) {
 	float sum = 0;
 	for (int i = 0; i < length; i++) {
@@ -19,7 +25,14 @@ float mean(float *array, int length) {
 	}
 	return sum / length;
 }
-// Function to calculate the median
+
+/**
+ * Calculate the median of an array.
+ *
+ * @param array Pointer to the array of floats
+ * @param count Number of elements in the array
+ * @return The calculated median of the array
+ */
 float median(float *array, int count) {
     // Sort the array
     for (int i = 0; i < count - 1; i++) {
@@ -43,7 +56,15 @@ float median(float *array, int count) {
     }
 }
 
-// High-pass filter function
+/**
+ * Apply a high-pass filter to a signal.
+ *
+ * @param input Current signal input
+ * @param prevInput Pointer to the previous input value
+ * @param prevOutput Pointer to the previous output value
+ * @param alpha Filter coefficient
+ * @return The filtered signal output
+ */
 float highPassFilter(float input, float *prevInput, float *prevOutput, float alpha) {
     float inputF = input; // No need to cast, input is already float
     float output = alpha * (*prevOutput + inputF - *prevInput);
@@ -52,7 +73,16 @@ float highPassFilter(float input, float *prevInput, float *prevOutput, float alp
     return output;
 }
 
-// Main processing function
+/**
+ * Process a PPG signal by buffering and calculating the mean when the buffer is full.
+ *
+ * @param ppg_signal_rdc Current PPG signal value
+ * @param buffer Pointer to the buffer array for storing values
+ * @param M Size of the buffer
+ * @param i Pointer to the current index in the buffer
+ * @param filled Pointer to the flag indicating if the buffer is full
+ * @return The calculated mean of the buffer, or 0.0 if the buffer is not yet full
+ */
 float process_ppg_signal(float ppg_signal_rdc, float *buffer, int M, int *i, int *filled) {
     float output = 0.0;
 
@@ -78,7 +108,14 @@ float process_ppg_signal(float ppg_signal_rdc, float *buffer, int M, int *i, int
 }
 
 
-// Main function to find peaks
+/**
+ * Detect peaks in the data buffer to identify R-peaks.
+ *
+ * @param dataBuffer Pointer to the input signal array
+ * @param length Number of samples in the dataBuffer
+ * @param R Pointer to an array to store detected R-peak indices
+ * @param R_count Pointer to store the number of detected R-peaks
+ */
 void findPeaks(float *dataBuffer, int length, uint32_t *R, uint32_t *R_count) {
 	int Nd = 3;
 //	int N = 4;
@@ -153,6 +190,13 @@ void findPeaks(float *dataBuffer, int length, uint32_t *R, uint32_t *R_count) {
 // 	}
 }
 
+/**
+ * Calculate heart rate from detected R-peak indices.
+ *
+ * @param R Pointer to the array of R-peak indices
+ * @param R_count Number of detected R-peaks
+ * @return Calculated heart rate in beats per minute (BPM), or 0 on error
+ */
 uint16_t heartRate(uint32_t *R, int R_count) {
     if (R_count < 3 || R_count >= 12) {
         return 0; // Return 0 if insufficient data
@@ -185,6 +229,14 @@ uint16_t heartRate(uint32_t *R, int R_count) {
     return HR;
 }
 
+
+/**
+ * Detect whether a finger is present based on signal thresholds.
+ *
+ * @param dataBuffer Pointer to the signal data array
+ * @param bufferSize Number of samples in the dataBuffer
+ * @return 1 if a finger is detected, 0 otherwise
+ */
 uint16_t isFingerDetected(float *dataBuffer, size_t bufferSize) {
     // Check for invalid inputs
     if (dataBuffer == NULL || bufferSize == 0) {
