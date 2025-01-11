@@ -56,6 +56,6 @@ This project demonstrates a real-time heart rate and SpO₂ monitoring system us
 4. Use the **LCD touch interface** to adjust signal gain and toggle filters.
 
 
-##Connection
+## Connection
 ![connection](https://github.com/user-attachments/assets/845c73fb-bd37-4d37-a146-4427d0e62c21)
 
