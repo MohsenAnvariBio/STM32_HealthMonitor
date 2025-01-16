@@ -59,3 +59,12 @@ This project demonstrates a real-time heart rate and SpO₂ monitoring system us
 ## Connection
 ![connection](https://github.com/user-attachments/assets/845c73fb-bd37-4d37-a146-4427d0e62c21)
 
+## Device 
+- **Original Signal Distorted by Noise**
+
+![with noise](https://github.com/user-attachments/assets/50f2d540-353e-4222-b874-07062c853134)
+
+- **Signal Smoothing using Low-pass Filter**
+
+![clear signal](https://github.com/user-attachments/assets/e82233f5-fa9f-4a1e-8a8d-29842b2b88be)
+
